@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: reserve_sistem_db
+      POSTGRES_DB: reserve_system_db
     ports:
       - "5432:5432"
     volumes:
