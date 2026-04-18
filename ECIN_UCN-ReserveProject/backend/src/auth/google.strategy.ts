@@ -23,7 +23,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     const email = emails[0].value;
 
     
-    const allowedDomain = '@ucn.cl'; 
+    const allowedDomain = '@alumnos.ucn.cl'; 
 
     if (!email.endsWith(allowedDomain)) {
       return done(new UnauthorizedException('Solo se permiten correos institucionales de la UCN'), false);
