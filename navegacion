@@ -1,0 +1,7 @@
+Login
+|
+|__Main
+    |
+    |__Reservas < - > desplegable reservas
+    |
+    |__Historial
