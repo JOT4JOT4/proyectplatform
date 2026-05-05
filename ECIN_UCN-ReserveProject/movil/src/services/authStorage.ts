@@ -4,7 +4,14 @@ const STORAGE_KEY = 'ecin_auth';
 
 export type StoredAuth = {
   token: string;
-  user: { email: string } | null;
+  user: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    picture?: string;
+    role?: string;
+    id?: number;
+  } | null;
 };
 
 export async function saveAuth(data: StoredAuth): Promise<void> {

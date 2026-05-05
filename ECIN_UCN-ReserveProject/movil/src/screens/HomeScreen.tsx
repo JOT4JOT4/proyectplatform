@@ -5,16 +5,12 @@ import { API_URL } from '../config/environment';
 
 const highlights = [
   {
-    title: 'Base lista para crecer',
-    description: 'Estructura inicial con separación por pantallas, configuración y utilidades.',
+    title: 'Reservar',
+    description: 'Abajo encontrarás la pantalla para reservar salas, con selección de fecha, hora y espacio.',
   },
   {
-    title: 'API preparada',
-    description: 'La URL del backend queda centralizada para conectar login, reservas o perfiles.',
-  },
-  {
-    title: 'Expo + TypeScript',
-    description: 'Arranque rápido para Android, iOS y web con tipado estricto desde el inicio.',
+    title: 'Historial',
+    description: 'Ofrecemos una pantalla de historial para revisar tus reservas pasadas y futuras, con detalles de cada una.',
   },
 ];
 
@@ -27,28 +23,11 @@ export function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.heroCard}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Mobile starter</Text>
-            </View>
-            <Text style={styles.title}>ECIN UCN Reserva</Text>
-            <Text style={styles.subtitle}>
-              Punto de partida móvil para la aplicación de reservas. Aquí puedes conectar el backend,
-              definir pantallas y crecer sin rehacer la base.
-            </Text>
-
-            <View style={styles.endpointCard}>
-              <Text style={styles.endpointLabel}>Backend configurado</Text>
-              <Text style={styles.endpointValue}>{API_URL}</Text>
-              <Text style={styles.endpointHint}>
-                Cambia esta URL en `.env` cuando necesites apuntar a tu API local o de red.
-              </Text>
-            </View>
-          </View>
+          
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Fundación incluida</Text>
-            <Text style={styles.sectionSubtitle}>Tres piezas para arrancar el flujo móvil con orden.</Text>
+            <Text style={styles.sectionTitle}>ECIN RESERVAS UCN</Text>
+            <Text style={styles.sectionSubtitle}>Aplicación para la reserva de espacios en la escuela de ingeniería </Text>
           </View>
 
           {highlights.map((item) => (
@@ -57,11 +36,20 @@ export function HomeScreen() {
               <Text style={styles.highlightDescription}>{item.description}</Text>
             </View>
           ))}
-
           <View style={styles.footerCard}>
-            <Text style={styles.footerTitle}>Siguiente paso natural</Text>
+            <Text style={styles.footerTitle}>Preguntas Fecuentes</Text>
             <Text style={styles.footerText}>
-              Crear navegación, estados de autenticación y la primera pantalla funcional de la app.
+              ¿Que hago después de reservar?{'\n'}
+              una ves reservada, recibirás un correo de confirmación con el detalle de tu reserva, simplemente dirigete a la sala, esta esperará abierta{'\n'}
+              ¿Que hago después de reservar?{'\n'}
+              una ves reservada, recibirás un correo de confirmación con el detalle de tu reserva, simplemente dirigete a la sala, esta esperará abierta{'\n'}
+            </Text>
+          </View>
+          <View style={styles.footerCard}>
+            <Text style={styles.footerTitle}>Soporte</Text>
+            <Text style={styles.footerText}>
+              Telefono: +56 9 1234 5678{'\n'}
+              Email: soporte@ucn.cl {'\n'}
             </Text>
           </View>
         </ScrollView>
