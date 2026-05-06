@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { saveAuth, getAuth, deleteAuth, StoredAuth } from '../services/authStorage';
 
-type User = { email: string } | null;
+type User = StoredAuth['user'];
 
 type AuthContextType = {
   user: User;

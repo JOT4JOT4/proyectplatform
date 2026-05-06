@@ -1,55 +1,91 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import { useAuth } from '../contexts/AuthContext';
+import { GOOGLE_AUTH_CALLBACK_URL, GOOGLE_AUTH_URL } from '../config/environment';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const ENABLE_MOCK_AUTH = true;
+const MOCK_USER = {
+  email: 'demo@ucn.cl',
+  firstName: 'Usuario',
+  lastName: 'Demo',
+  picture: undefined,
+  role: 'student',
+  id: 0,
+};
+
+const MOCK_TOKEN = 'demo-token';
+
 export default function LoginScreen() {
   const { signIn } = useAuth();
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    scopes: ['profile', 'email'],
-  });
+  const [isSigningIn, setIsSigningIn] = React.useState(false);
 
   React.useEffect(() => {
-    const handle = async () => {
-      if (response?.type === 'success') {
-        const { authentication } = response;
-        // Fetch user info from Google
-        const token = authentication?.accessToken ?? '';
-        try {
-          const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const profile = await res.json();
-          await signIn({ email: profile.email }, token);
-        } catch (e) {
-          console.warn('Failed to fetch Google profile', e);
-        }
+    if (!ENABLE_MOCK_AUTH) {
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      setIsSigningIn(true);
+      await signIn(MOCK_USER, MOCK_TOKEN);
+
+      if (active) {
+        setIsSigningIn(false);
       }
+    })();
+
+    return () => {
+      active = false;
     };
-    handle();
-  }, [response]);
+  }, [signIn]);
 
   const handleGoogleSignIn = async () => {
-    await promptAsync();
+    if (ENABLE_MOCK_AUTH) {
+      await signIn(MOCK_USER, MOCK_TOKEN);
+      return;
+    }
+
+    try {
+      setIsSigningIn(true);
+      const result = await WebBrowser.openAuthSessionAsync(GOOGLE_AUTH_URL, GOOGLE_AUTH_CALLBACK_URL);
+
+      if (result.type !== 'success' || !result.url) {
+        return;
+      }
+
+      const response = await fetch(result.url);
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.access_token || !payload?.user) {
+        throw new Error(payload?.message ?? 'No se pudo completar el inicio de sesión');
+      }
+
+      await signIn(payload.user, payload.access_token);
+    } catch (error) {
+      console.warn('Failed to complete backend Google login', error);
+    } finally {
+      setIsSigningIn(false);
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bienvenido a ECIN UCN Reserva</Text>
+      <Text style={styles.title}>Bienvenido a Reservas UCN</Text>
       <Text style={styles.subtitle}>Identifícate con Google para continuar</Text>
 
-      <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn}>
-        <Text style={styles.buttonText}>Iniciar sesión con Google</Text>
-      </TouchableOpacity>
+      {ENABLE_MOCK_AUTH ? <Text style={styles.hint}>Modo demo activo: acceso automático temporal para probar la navegación.</Text> : null}
 
-      <Text style={styles.hint}>Esta es una autenticación de prueba local.</Text>
+      <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
+        {isSigningIn ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Iniciar sesión con Google</Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -63,29 +99,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A1120',
   },
   title: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 22,
     fontWeight: '800',
     marginBottom: 8,
   },
   subtitle: {
-    color: '#AAB7CE',
+    color: '#ffffff',
     marginBottom: 24,
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#adc1e6',
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: '#000000',
     fontWeight: '700',
   },
   hint: {
     marginTop: 12,
-    color: '#AAB7CE',
+    color: '#adc1e6',
     fontSize: 12,
   },
 });
