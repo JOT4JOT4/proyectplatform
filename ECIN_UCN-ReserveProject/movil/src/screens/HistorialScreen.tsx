@@ -4,14 +4,26 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiGet, ApiError } from '../services/apiClient';
 import type { HistorialReserva } from '../services/apiTypes';
 
-const HISTORY: HistorialReserva[] = [
-  { id: 'h1', title: 'Sala A - 2026-04-20', status: 'Completada' },
-  { id: 'h2', title: 'Sala B - 2026-04-30', status: 'Pendiente' },
-];
+interface BackendReservation {
+  id: string;
+  spaceTitle: string;
+  spaceDescription?: string;
+  reservationDate: string;
+  reservationSlot: string;
+  area?: string | null;
+  tipo?: string | null;
+  createdAt?: string;
+}
+
+const mapBackendToHistorial = (backend: BackendReservation): HistorialReserva => ({
+  id: backend.id,
+  title: `${backend.spaceTitle} - ${backend.reservationDate}`,
+  status: 'Reservada',
+});
 
 export default function HistorialScreen() {
   const { token } = useAuth();
-  const [items, setItems] = React.useState<HistorialReserva[]>(HISTORY);
+  const [items, setItems] = React.useState<HistorialReserva[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -22,18 +34,20 @@ export default function HistorialScreen() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await apiGet<HistorialReserva[]>('/historial', token);
+        const data = await apiGet<BackendReservation[]>('/reservas/mine', token);
 
-        if (active && Array.isArray(data) && data.length > 0) {
-          setItems(data);
+        if (active && Array.isArray(data)) {
+          const mapped = data.map(mapBackendToHistorial);
+          setItems(mapped);
         }
       } catch (requestError) {
         if (requestError instanceof ApiError && requestError.status === 404) {
+          setError('No hay historial disponible.');
           return;
         }
 
         if (active) {
-          setError('Se muestra historial de ejemplo mientras el backend no expone /historial.');
+          setError('Error al cargar el historial de reservas.');
         }
       } finally {
         if (active) {

@@ -7,151 +7,33 @@ import type { Reserva } from '../services/apiTypes';
 import DateTimePicker from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
 
-const SAMPLE: Reserva[] = [
-  {
-    id: '1',
-    title: 'Sala A',
-    details: 'Capacidad 10. Proyector disponible. Acceso a mesas compartidas.',
-    description: 'Espacio principal para clases y reuniones medianas.',
-    date: '2026-05-06',
-    slot: 'A',
-    area: 'Edificio 1',
-    tipo: 'Sala',
-    children: [
-      {
-        id: '1-1',
-        title: 'Mesas A1',
-        details: 'Mesa 1 dentro de Sala A. Reserva individual.',
-        description: 'Mesa pequeña reservable por separado dentro de la Sala A.',
-        date: '2026-05-06',
-        slot: 'A',
-        area: 'Sala A',
-        tipo: 'Mesa',
-      },
-      {
-        id: '1-2',
-        title: 'Mesas A2',
-        details: 'Mesa 2 dentro de Sala A. Reserva individual.',
-        description: 'Segunda mesa separada para uso flexible.',
-        date: '2026-05-06',
-        slot: 'B',
-        area: 'Sala A',
-        tipo: 'Mesa',
-      },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Sala B',
-    details: 'Capacidad 6. Videoconferencia. Configuración básica editable.',
-    description: 'Espacio pensado para trabajo colaborativo y reuniones cortas.',
-    date: '2026-05-06',
-    slot: 'B',
-    area: 'Edificio 2',
-    tipo: 'Aula',
-  },
-  {
-    id: '3',
-    title: 'Sala C',
-    details: 'Capacidad 4. Sin equipamiento. Puede ampliarse con subespacios.',
-    description: 'Espacio sencillo para reuniones pequeñas.',
-    date: '2026-05-07',
-    slot: 'D',
-    area: 'Edificio 1',
-    tipo: 'Sala',
-  },
-  {
-    id: '4',
-    title: 'Sala D',
-    details: 'Capacidad 12. Laboratorio con área externa para mesas.',
-    description: 'Laboratorio con posibilidad de reservar estaciones internas.',
-    date: '2026-05-08',
-    slot: 'E',
-    area: 'Edificio 3',
-    tipo: 'Laboratorio',
-    children: [
-      {
-        id: '4-1',
-        title: 'Mesa D1',
-        details: 'Estación interna para trabajo individual.',
-        description: 'Mesa reservable por separado dentro del laboratorio.',
-        date: '2026-05-08',
-        slot: 'E',
-        area: 'Sala D',
-        tipo: 'Mesa',
-      },
-    ],
-  },
-  {
-    id: '5',
-    title: 'Biblioteca Norte',
-    details: 'Zona silenciosa con salas de estudio y cubículos reservables.',
-    description: 'Espacio amplio con subáreas para estudio individual y grupal.',
-    date: '2026-05-09',
-    slot: 'F',
-    area: 'Biblioteca',
-    tipo: 'Zona de estudio',
-    children: [
-      {
-        id: '5-1',
-        title: 'Cubículo 1',
-        details: 'Cubículo pequeño para una persona.',
-        description: 'Subespacio individual dentro de la biblioteca.',
-        date: '2026-05-09',
-        slot: 'F',
-        area: 'Biblioteca Norte',
-        tipo: 'Cubículo',
-      },
-      {
-        id: '5-2',
-        title: 'Mesa grupal 1',
-        details: 'Mesa para 4 personas con pizarra cercana.',
-        description: 'Subespacio grupal para trabajo colaborativo.',
-        date: '2026-05-09',
-        slot: 'G',
-        area: 'Biblioteca Norte',
-        tipo: 'Mesa',
-      },
-    ],
-  },
-  {
-    id: '6',
-    title: 'Laboratorio Creativo',
-    details: 'Espacio de prototipado con estaciones internas y equipamiento compartido.',
-    description: 'Laboratorio con puestos reservables y una sala de apoyo.',
-    date: '2026-05-10',
-    slot: 'C2',
-    area: 'Edificio 4',
-    tipo: 'Laboratorio',
-    children: [
-      {
-        id: '6-1',
-        title: 'Estación 1',
-        details: 'Mesa con acceso a herramientas básicas.',
-        description: 'Puesto individual para prototipado.',
-        date: '2026-05-10',
-        slot: 'C2',
-        area: 'Laboratorio Creativo',
-        tipo: 'Estación',
-      },
-      {
-        id: '6-2',
-        title: 'Estación 2',
-        details: 'Mesa con monitor y conexión de energía.',
-        description: 'Puesto adicional separable del espacio principal.',
-        date: '2026-05-10',
-        slot: 'D',
-        area: 'Laboratorio Creativo',
-        tipo: 'Estación',
-      },
-    ],
-  },
-];
+// Map backend response to Reserva type
+interface BackendReservation {
+  id: string;
+  spaceTitle: string;
+  spaceDescription?: string;
+  reservationDate: string;
+  reservationSlot: string;
+  area?: string | null;
+  tipo?: string | null;
+  space?: Record<string, any>;
+}
+
+const mapBackendToReserva = (backend: BackendReservation): Reserva => ({
+  id: backend.id,
+  title: backend.spaceTitle,
+  details: backend.spaceDescription || '',
+  description: backend.spaceDescription,
+  date: backend.reservationDate,
+  slot: backend.reservationSlot,
+  area: backend.area ?? undefined,
+  tipo: backend.tipo ?? undefined,
+});
 
 export default function ReservasScreen() {
   const { token } = useAuth();
   const [expanded, setExpanded] = React.useState<string | null>(null);
-  const [items, setItems] = React.useState<Reserva[]>(SAMPLE);
+  const [items, setItems] = React.useState<Reserva[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [reservationTarget, setReservationTarget] = React.useState<Reserva | null>(null);
@@ -183,33 +65,39 @@ export default function ReservasScreen() {
 
   const uniqueDates = React.useMemo(() => {
     const s = new Set<string>();
-    SAMPLE.forEach((r) => r.date && s.add(r.date));
+    items.forEach((r) => r.date && s.add(r.date));
     return Array.from(s).sort();
-  }, []);
+  }, [items]);
 
   const uniqueAreas = React.useMemo(() => {
     const s = new Set<string>();
-    SAMPLE.forEach((r) => r.area && s.add(r.area));
+    items.forEach((r) => r.area && s.add(r.area));
     return Array.from(s).sort();
-  }, []);
+  }, [items]);
 
   const uniqueTipos = React.useMemo(() => {
     const s = new Set<string>();
-    SAMPLE.forEach((r) => r.tipo && s.add(r.tipo));
+    items.forEach((r) => r.tipo && s.add(r.tipo));
     return Array.from(s).sort();
-  }, []);
+  }, [items]);
 
   const toggle = (id: string) => setExpanded((s) => (s === id ? null : id));
 
   const loadReservations = React.useCallback(async () => {
-    const data = await apiGet<Reserva[]>('/reservas', token);
+    try {
+      const data = await apiGet<BackendReservation[]>('/reservas', token);
 
-    if (Array.isArray(data) && data.length > 0) {
-      setItems(data);
-      return true;
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = data.map(mapBackendToReserva);
+        setItems(mapped);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error('Error loading reservations:', err);
+      throw err;
     }
-
-    return false;
   }, [token]);
 
   const handleReserve = (item: Reserva) => {
@@ -249,24 +137,23 @@ export default function ReservasScreen() {
     const payload = buildReservationPayload(reservationTarget);
     try {
       setIsLoading(true);
-      const created = await apiPost<Reserva | unknown>('/reservas', payload, token);
+      const created = await apiPost<BackendReservation | unknown>('/reservas', payload, token);
 
-      const createdReserva: Reserva =
-        created && typeof created === 'object' && 'id' in created && 'title' in created
-          ? ({
-              ...reservationTarget,
-              ...(created as Reserva),
-              description: (created as Reserva).description ?? reservationTarget.description ?? reservationTarget.details,
-            } as Reserva)
-          : {
-              ...reservationTarget,
-              id: `local-${Date.now()}`,
-              date: payload.reservationDate,
-              slot: payload.reservationSlot ?? undefined,
-              area: payload.space.area ?? undefined,
-              tipo: payload.space.tipo ?? undefined,
-              description: payload.space.description ?? reservationTarget.description ?? reservationTarget.details,
-            };
+      let createdReserva: Reserva;
+      
+      if (created && typeof created === 'object' && 'id' in created) {
+        createdReserva = mapBackendToReserva(created as BackendReservation);
+      } else {
+        createdReserva = {
+          ...reservationTarget,
+          id: `local-${Date.now()}`,
+          date: payload.reservationDate,
+          slot: payload.reservationSlot ?? undefined,
+          area: payload.space.area ?? undefined,
+          tipo: payload.space.tipo ?? undefined,
+          description: payload.space.description ?? reservationTarget.description ?? reservationTarget.details,
+        };
+      }
 
       setItems((current) => [createdReserva, ...current]);
       setShowReserveModal(false);
@@ -292,7 +179,8 @@ export default function ReservasScreen() {
         const hadRemoteData = await loadReservations();
 
         if (active && !hadRemoteData) {
-          setItems(SAMPLE);
+          setError('No hay reservas disponibles en el servidor.');
+          setItems([]);
         }
       } catch (requestError) {
         if (requestError instanceof ApiError && requestError.status === 404) {
@@ -300,7 +188,7 @@ export default function ReservasScreen() {
         }
 
         if (active) {
-          setError('Se muestran reservas de ejemplo mientras el backend no expone /reservas.');
+          setError('No se puede encontrar reservas');
         }
       } finally {
         if (active) {
