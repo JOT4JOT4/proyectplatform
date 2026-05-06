@@ -55,3 +55,12 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
 export async function apiGet<T>(path: string, token?: string | null): Promise<T> {
   return apiRequest<T>(path, { method: 'GET', token });
 }
+
+export async function apiPost<T>(path: string, body: unknown, token?: string | null): Promise<T> {
+  return apiRequest<T>(path, {
+    method: 'POST',
+    token,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}

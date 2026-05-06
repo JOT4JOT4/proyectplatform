@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { apiGet, ApiError } from '../services/apiClient';
+import { apiGet, apiPost, ApiError } from '../services/apiClient';
+import { Alert } from 'react-native';
 import type { Reserva } from '../services/apiTypes';
 import DateTimePicker from 'react-native-ui-datepicker';
 import dayjs from 'dayjs';
@@ -200,6 +201,17 @@ export default function ReservasScreen() {
 
   const toggle = (id: string) => setExpanded((s) => (s === id ? null : id));
 
+  const loadReservations = React.useCallback(async () => {
+    const data = await apiGet<Reserva[]>('/reservas', token);
+
+    if (Array.isArray(data) && data.length > 0) {
+      setItems(data);
+      return true;
+    }
+
+    return false;
+  }, [token]);
+
   const handleReserve = (item: Reserva) => {
     setReservationTarget(item);
     setShowReserveModal(true);
@@ -231,15 +243,43 @@ export default function ReservasScreen() {
     };
   }, [items, selectedArea, selectedDate, selectedSlot, selectedTipo]);
 
-  const handleConfirmReservation = () => {
-    if (!reservationTarget) {
-      return;
-    }
+  const handleConfirmReservation = async () => {
+    if (!reservationTarget) return;
 
     const payload = buildReservationPayload(reservationTarget);
-    console.log('Reservation payload ready for backend:', payload);
-    setShowReserveModal(false);
-    setReservationTarget(null);
+    try {
+      setIsLoading(true);
+      const created = await apiPost<Reserva | unknown>('/reservas', payload, token);
+
+      const createdReserva: Reserva =
+        created && typeof created === 'object' && 'id' in created && 'title' in created
+          ? ({
+              ...reservationTarget,
+              ...(created as Reserva),
+              description: (created as Reserva).description ?? reservationTarget.description ?? reservationTarget.details,
+            } as Reserva)
+          : {
+              ...reservationTarget,
+              id: `local-${Date.now()}`,
+              date: payload.reservationDate,
+              slot: payload.reservationSlot ?? undefined,
+              area: payload.space.area ?? undefined,
+              tipo: payload.space.tipo ?? undefined,
+              description: payload.space.description ?? reservationTarget.description ?? reservationTarget.details,
+            };
+
+      setItems((current) => [createdReserva, ...current]);
+      setShowReserveModal(false);
+      setReservationTarget(null);
+      Alert.alert('Reserva creada', 'Tu reserva se ha enviado correctamente.');
+
+      void loadReservations();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Error al crear la reserva.';
+      Alert.alert('Error', message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   React.useEffect(() => {
@@ -249,10 +289,10 @@ export default function ReservasScreen() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await apiGet<Reserva[]>('/reservas', token);
+        const hadRemoteData = await loadReservations();
 
-        if (active && Array.isArray(data) && data.length > 0) {
-          setItems(data);
+        if (active && !hadRemoteData) {
+          setItems(SAMPLE);
         }
       } catch (requestError) {
         if (requestError instanceof ApiError && requestError.status === 404) {
@@ -272,7 +312,7 @@ export default function ReservasScreen() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [loadReservations, token]);
 
   // derived filtered items
   const filtered = React.useMemo(() => {
@@ -285,6 +325,8 @@ export default function ReservasScreen() {
     });
   }, [items, selectedDate, selectedSlot, selectedArea, selectedTipo]);
 
+  const reservePreview = React.useMemo(() => (reservationTarget ? buildReservationPayload(reservationTarget) : null), [reservationTarget, buildReservationPayload]);
+
   return (
     <View style={styles.container}>
       <View style={styles.glowTop} />
@@ -296,10 +338,10 @@ export default function ReservasScreen() {
       {/* Filter bar */}
       <View style={styles.filterBar}>
         <TouchableOpacity style={styles.filterButton} onPress={() => setShowDateModal(true)}>
-          <Text style={styles.filterText}>{selectedDate}</Text>
+          <Text style={styles.filterText}>{selectedDate ?? 'Fecha'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.filterButton} onPress={() => setShowSlotModal(true)}>
-          <Text style={styles.filterText}>{selectedSlot ?? 'Horario'}</Text>
+          <Text style={styles.filterText}>{selectedSlot ?? 'Bloque'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.filterButton} onPress={() => setShowAreaModal(true)}>
           <Text style={styles.filterText}>{selectedArea ?? 'Area'}</Text>
@@ -429,13 +471,16 @@ export default function ReservasScreen() {
             <Text style={styles.reserveSummaryTitle}>{reservationTarget?.title ?? 'Sin selección'}</Text>
             <Text style={styles.reserveSummaryText}>{reservationTarget?.description ?? reservationTarget?.details}</Text>
 
-            <View style={styles.payloadBox}>
-              <Text style={styles.payloadLabel}>Payload preparado para backend</Text>
-              <ScrollView style={styles.payloadScroll}>
-                <Text style={styles.payloadText} selectable>
-                  {JSON.stringify(reservationTarget ? buildReservationPayload(reservationTarget) : {}, null, 2)}
-                </Text>
-              </ScrollView>
+            <View style={styles.summaryBox}>
+              <Text style={styles.payloadLabel}>Resumen de reserva</Text>
+              <Text style={styles.summaryLine}>Fecha: {reservePreview?.reservationDate ?? '—'}</Text>
+              <Text style={styles.summaryLine}>Horario: {reservePreview?.reservationSlot ?? '—'}</Text>
+              <Text style={styles.summaryLine}>Área: {reservePreview?.space.area ?? '—'}</Text>
+              <Text style={styles.summaryLine}>Tipo: {reservePreview?.space.tipo ?? '—'}</Text>
+              {reservePreview?.space.isSubspace ? (
+                <Text style={styles.summaryLine}>Subespacio de: {reservePreview.space.parentSpaceTitle ?? '—'}</Text>
+              ) : null}
+              <Text style={styles.summaryLine}>Solicitado: {reservePreview ? dayjs(reservePreview.requestedAt).format('YYYY-MM-DD HH:mm') : '—'}</Text>
             </View>
 
             <View style={styles.reserveActions}>
@@ -593,6 +638,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontFamily: 'monospace',
+  },
+  summaryBox: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 89, 233, 0.12)',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: 'rgba(8, 16, 38, 0.03)',
+  },
+  summaryLine: {
+    color: '#081026',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 6,
   },
   reserveActions: {
     flexDirection: 'row',
