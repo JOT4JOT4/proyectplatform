@@ -1,0 +1,98 @@
+.login-container {
+  height: 100vh;
+  background-color: #87a6c0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.login-box {
+  background: #e6e6e6;
+  padding: 40px;
+  border-radius: 30px;
+  width: 350px;
+  text-align: center;
+}
+
+.login-title {
+  font-size: 40px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid black;
+  display: inline-block;
+}
+
+.divider {
+  margin: 20px 0;
+  display: flex;
+  align-items: center;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid black;
+}
+
+.line {
+  margin-bottom: 20px;
+  border-bottom: 2px solid black;
+  display: inline-block;
+}
+
+.divider span {
+  margin: 0 10px;
+}
+
+.google-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid black;
+  background: white;
+  cursor: pointer;
+  font-weight: bold;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  transition: 0.3s;
+}
+
+.google-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.google-btn:active {
+  transform: scale(0.98);
+}
+
+.forgot-password {
+  margin-top: 15px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #333333;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+.logo-google {
+  width: 20px;
+  height: 20px;
+}
+
+.logo-ucn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 300px;
+
+  border-radius: 5%;
+  box-shadow: 0px 5px 15px rgba(0,0,0,0.3);
+  
+}

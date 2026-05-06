@@ -5,7 +5,8 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
 import { GoogleStrategy } from './google.strategy';
-import { UsersModule } from '../users/users.module'; 
+import { UsersModule } from '../users/users.module';
+import { GoogleWebStrategy } from './google-web.strategy';
 
 @Module({
   imports: [
@@ -13,10 +14,10 @@ import { UsersModule } from '../users/users.module';
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'UCN-reservas-c9td5ij4n',
-      signOptions: { expiresIn: '1d' }, 
+      signOptions: { expiresIn: '1d' },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy,JwtStrategy],
+  providers: [AuthService, GoogleStrategy, GoogleWebStrategy, JwtStrategy],
 })
 export class AuthModule {}
