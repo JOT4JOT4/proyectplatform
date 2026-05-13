@@ -5,6 +5,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SpacesModule } from './spaces/spaces.module';
 
 @Module({
   imports: [UsersModule, AuthModule,ConfigModule.forRoot({isGlobal: true,}),
@@ -22,6 +23,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         synchronize: true, 
       }),
     }),
+    SpacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
