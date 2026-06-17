@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SpacesModule } from './spaces/spaces.module';
+import { ReservationsModule } from './reservations/reservations.module';
 
 @Module({
   imports: [UsersModule, AuthModule,ConfigModule.forRoot({isGlobal: true,}),
@@ -24,6 +25,7 @@ import { SpacesModule } from './spaces/spaces.module';
       }),
     }),
     SpacesModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
