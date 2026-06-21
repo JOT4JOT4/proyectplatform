@@ -21,4 +21,10 @@ export class ReservationsController {
   cancel(@Param('id') id: string) {
     return this.reservationsService.cancel(id);
   }
+
+  @Get('user/:userId')
+  findByUser(@Param('userId') userId: string) {
+    return this.reservationsService.findByUser(userId);
+  }
+
 }

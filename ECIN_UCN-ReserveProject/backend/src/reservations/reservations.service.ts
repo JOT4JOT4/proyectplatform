@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Reservation, ReservationStatus } from './entities/reservation.entity';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { Space } from '../spaces/entities/space.entity';
 
 @Injectable()
 export class ReservationsService {
@@ -17,40 +18,51 @@ export class ReservationsService {
   async create(createReservationDto: CreateReservationDto, userId: string = 'dummy-user') {
     const { spaceId, date, startTime, endTime } = createReservationDto;
 
-    // 1. Validar lógica de tiempo básico
     if (startTime >= endTime) {
       throw new BadRequestException('La hora de inicio debe ser menor a la hora de término.');
     }
 
-    // 2. Validar límite semanal del usuario (Ej: Máximo 3 por semana)
-    await this.checkWeeklyLimit(userId, date);
+    return await this.reservationRepository.manager.transaction(async (transactionalEntityManager) => {
+      
+      // 1. Si otra petición intenta usar esta misma sala al mismo milisegundo, esperará 
+      const space = await transactionalEntityManager.findOne(Space, {
+        where: { id: spaceId },
+        lock: { mode: 'pessimistic_write' } 
+      });
 
-    // 3. Escudo Anti-Colisiones (Overlap Check):
-    // Revisa si ya existe alguna reserva activa que se cruce con este horario
-    const overlappingReservations = await this.reservationRepository.createQueryBuilder('reservation')
-      .where('reservation.spaceId = :spaceId', { spaceId })
-      .andWhere('reservation.date = :date', { date })
-      .andWhere('reservation.status = :status', { status: ReservationStatus.ACTIVE })
-      .andWhere(
-        '((reservation.startTime < :endTime AND reservation.endTime > :startTime))',
-        { startTime, endTime }
-      )
-      .getMany();
+      if (!space) {
+        throw new NotFoundException('El espacio seleccionado no existe.');
+      }
 
-    if (overlappingReservations.length > 0) {
-      throw new ConflictException('El espacio ya se encuentra reservado en ese rango de horario.');
-    }
+      // 2. Validar límite semanal del usuario
+      await this.checkWeeklyLimit(userId, date);
 
-    // 4. Crear y guardar si pasó todas las pruebas
-    const newReservation = this.reservationRepository.create({
-      date,
-      startTime,
-      endTime,
-      space: { id: spaceId },
-      // user: { id: userId }, //  Descomentar cuando la entidad User esté vinculada
+      // 3. Revisar colisiones de horario (usando el manager de la transacción)
+      const overlappingReservations = await transactionalEntityManager.createQueryBuilder(Reservation, 'reservation')
+        .where('reservation.spaceId = :spaceId', { spaceId })
+        .andWhere('reservation.date = :date', { date })
+        .andWhere('reservation.status = :status', { status: ReservationStatus.ACTIVE })
+        .andWhere(
+          '((reservation.startTime < :endTime AND reservation.endTime > :startTime))',
+          { startTime, endTime }
+        )
+        .getMany();
+
+      if (overlappingReservations.length > 0) {
+        throw new ConflictException('El espacio ya se encuentra reservado en ese rango de horario.');
+      }
+
+      // 4. Guardar la reserva de forma segura
+      const newReservation = transactionalEntityManager.create(Reservation, {
+        date,
+        startTime,
+        endTime,
+        space: { id: spaceId },
+        // user: { id: userId } //  Descomentar cuando la entidad User esté vinculada
+      });
+
+      return await transactionalEntityManager.save(Reservation, newReservation);
     });
-
-    return await this.reservationRepository.save(newReservation);
   }
 
   /**
@@ -141,4 +153,21 @@ export class ReservationsService {
     reservation.status = ReservationStatus.CANCELLED;
     return await this.reservationRepository.save(reservation);
   }
+
+  /**
+   * HISTORIAL DE RESERVAS (SCRUM-44)
+   */
+  async findByUser(userId: string) {
+    return await this.reservationRepository.find({
+      where: {
+      },
+      relations: ['space'], 
+      order: {
+        date: 'DESC',      
+        startTime: 'DESC'
+      }
+    });
+  } 
+
 }
+
