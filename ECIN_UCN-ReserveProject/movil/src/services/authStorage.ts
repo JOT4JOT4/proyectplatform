@@ -8,9 +8,9 @@ export type StoredAuth = {
     email: string;
     firstName?: string;
     lastName?: string;
-    picture?: string;
+    picture?: string | null;
     role?: string;
-    id?: number;
+    id?: string;
   } | null;
 };
 

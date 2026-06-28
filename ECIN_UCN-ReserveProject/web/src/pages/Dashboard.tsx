@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import logo from "../../assets/logo-ucn.png";
 import sala1 from "../../assets/sala indi.jpg";
 import sala2 from "../../assets/sala multi.jpg";
@@ -7,19 +7,39 @@ import "../css/dashboard.css";
 type Reserva = {
   id: number;
   sala: string;
+  nombre: string;
   tipo: string;
   area: string;
+  ubicacion: string;
+  descripcion: string;
+  capacidad: number;
+  equipamiento: string[];
+  reglas: string[];
+  horariosDisponibles: string[];
   fecha: string;
   horario: string;
   imagen?: string;
+};
+
+type ReservaGuardada = Reserva & {
+  fechaReservada: string;
+  horarioReservado: string;
 };
 
 const reservas: Reserva[] = [
   {
     id: 1,
     sala: "EIC 101",
+    nombre: "Sala de estudio individual",
     tipo: "Individual",
     area: "Escuela",
+    ubicacion: "Edificio de Ingeniería Civil, piso 1",
+    descripcion:
+      "Espacio silencioso para estudio individual, lectura y trabajo concentrado. Ideal para sesiones cortas o largas de preparación.",
+    capacidad: 2,
+    equipamiento: ["Escritorio individual", "Iluminación cálida", "Toma eléctrica"],
+    reglas: ["Mantener silencio", "No ingresar alimentos", "Respetar el tiempo reservado"],
+    horariosDisponibles: ["Bloque A", "Bloque C", "Bloque E"],
     fecha: "2026-04-09",
     horario: "Bloque E",
     imagen: sala1,
@@ -27,8 +47,16 @@ const reservas: Reserva[] = [
   {
     id: 2,
     sala: "EIC 102",
+    nombre: "Sala colaborativa multimodal",
     tipo: "Multiple",
     area: "Escuela",
+    ubicacion: "Edificio de Ingeniería Civil, piso 1",
+    descripcion:
+      "Sala amplia para grupos, presentaciones y sesiones colaborativas con mesas reconfigurables y apoyo visual.",
+    capacidad: 8,
+    equipamiento: ["Pizarra", "Mesas móviles", "Pantalla compartida", "Conectividad Wi-Fi"],
+    reglas: ["Máximo 8 personas", "No mover equipamiento fijo", "Dejar el espacio ordenado"],
+    horariosDisponibles: ["Bloque A", "Bloque B", "Bloque D", "Bloque F"],
     fecha: "2026-04-10",
     horario: "Bloque A",
     imagen: sala2,
@@ -43,7 +71,8 @@ export default function Dashboard() {
   const [tipo, setTipo] = useState("");
 
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
-  const [misReservas, setMisReservas] = useState<Reserva[]>([]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
+  const [misReservas, setMisReservas] = useState<ReservaGuardada[]>([]);
   const [vista, setVista] = useState<"salas" | "misReservas">("salas");
 
   const reservasFiltradas = reservas.filter((reserva) => {
@@ -56,17 +85,34 @@ export default function Dashboard() {
   });
 
   const handleReservar = () => {
-    if (!selectedReserva) return;
+    if (!selectedReserva || !selectedTimeSlot) return;
 
-    setMisReservas((prev) => {
-      const yaExiste = prev.some((reserva) => reserva.id === selectedReserva.id);
+    setMisReservas((prev: ReservaGuardada[]) => {
+      const yaExiste = prev.some(
+        (reserva) =>
+          reserva.id === selectedReserva.id &&
+          reserva.horarioReservado === selectedTimeSlot,
+      );
 
       if (yaExiste) return prev;
 
-      return [...prev, selectedReserva];
+      return [
+        ...prev,
+        {
+          ...selectedReserva,
+          fechaReservada: fecha || selectedReserva.fecha,
+          horarioReservado: selectedTimeSlot,
+        },
+      ];
     });
 
     setSelectedReserva(null);
+    setSelectedTimeSlot("");
+  };
+
+  const openReservationDetail = (reserva: Reserva) => {
+    setSelectedReserva(reserva);
+    setSelectedTimeSlot(reserva.horariosDisponibles[0] ?? reserva.horario);
   };
 
   const userEmail =
@@ -98,14 +144,14 @@ export default function Dashboard() {
             <input
               type="date"
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFecha(e.target.value)}
             />
           </div>
 
           <select
             className="filter-box"
             value={horario}
-            onChange={(e) => setHorario(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setHorario(e.target.value)}
           >
             <option value="">Horario</option>
             <option value="Bloque A">Bloque A</option>
@@ -122,7 +168,7 @@ export default function Dashboard() {
             <select
               className="side-filter"
               value={area}
-              onChange={(e) => setArea(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setArea(e.target.value)}
             >
               <option value="">Área</option>
               <option value="Escuela">Escuela</option>
@@ -131,7 +177,7 @@ export default function Dashboard() {
             <select
               className="side-filter"
               value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setTipo(e.target.value)}
             >
               <option value="">Tipo</option>
               <option value="Individual">Individual</option>
@@ -146,7 +192,7 @@ export default function Dashboard() {
                 <button
                   className="room-card"
                   key={reserva.id}
-                  onClick={() => setSelectedReserva(reserva)}
+                  onClick={() => openReservationDetail(reserva)}
                 >
                   <img
                     src={reserva.imagen}
@@ -156,7 +202,8 @@ export default function Dashboard() {
 
                   <div className="room-info">
                     <h3>{reserva.sala}</h3>
-                    <p>{reserva.tipo}</p>
+                    <p>{reserva.nombre}</p>
+                    <span>{reserva.ubicacion}</span>
                   </div>
                 </button>
               ))}
@@ -169,7 +216,7 @@ export default function Dashboard() {
 
             {vista === "misReservas" &&
               misReservas.map((reserva) => (
-                <button className="room-card" key={reserva.id}>
+                <button className="room-card" key={`${reserva.id}-${reserva.horarioReservado}`}>
                   <img
                     src={reserva.imagen}
                     alt={reserva.sala}
@@ -178,7 +225,10 @@ export default function Dashboard() {
 
                   <div className="room-info">
                     <h3>{reserva.sala}</h3>
-                    <p>{reserva.tipo}</p>
+                    <p>{reserva.nombre}</p>
+                    <span>
+                      {reserva.fechaReservada} · {reserva.horarioReservado}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -203,9 +253,7 @@ export default function Dashboard() {
                 </button>
 
                 <h1 className="modal-title">
-                  {selectedReserva.tipo === "Individual"
-                    ? "Sala Individual"
-                    : "Sala Compartida"}
+                  Detalle del espacio
                 </h1>
 
                 <div className="modal-content">
@@ -216,41 +264,69 @@ export default function Dashboard() {
 
                       <img
                         src={selectedReserva.imagen}
+                        alt={selectedReserva.sala}
                         className="modal-image"
                       />
 
-                      <div>
+                      <div className="modal-copy">
                         <h2>{selectedReserva.sala}</h2>
-                        <p>Sala reunion</p>
+                        <p>{selectedReserva.nombre}</p>
+                        <span>{selectedReserva.ubicacion}</span>
                       </div>
 
                     </div>
 
-                    <div className="description-box">
-                      <strong>Descripción:</strong>
+                    <div className="detail-blocks">
+                      <section className="detail-card detail-card--wide">
+                        <h3>Descripción</h3>
+                        <p>{selectedReserva.descripcion}</p>
+                      </section>
+
+                      <section className="detail-card">
+                        <h3>Datos del espacio</h3>
+                        <ul>
+                          <li><strong>Tipo:</strong> {selectedReserva.tipo}</li>
+                          <li><strong>Área:</strong> {selectedReserva.area}</li>
+                          <li><strong>Capacidad:</strong> {selectedReserva.capacidad} personas</li>
+                        </ul>
+                      </section>
+
+                      <section className="detail-card">
+                        <h3>Equipamiento</h3>
+                        <div className="chip-row">
+                          {selectedReserva.equipamiento.map((item) => (
+                            <span key={item} className="chip">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="detail-card detail-card--wide">
+                        <h3>Reglas de uso</h3>
+                        <ul className="rules-list">
+                          {selectedReserva.reglas.map((rule) => (
+                            <li key={rule}>{rule}</li>
+                          ))}
+                        </ul>
+                      </section>
+
+                      <section className="detail-card detail-card--wide">
+                        <h3>Horarios disponibles</h3>
+                        <div className="slots-grid">
+                          {selectedReserva.horariosDisponibles.map((slot) => (
+                            <button
+                              key={slot}
+                              type="button"
+                              className={`slot-btn ${selectedTimeSlot === slot ? "selected" : ""}`}
+                              onClick={() => setSelectedTimeSlot(slot)}
+                            >
+                              {slot}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
                     </div>
-
-                    <div className="details-box">
-                      <p>Tipo: {selectedReserva.tipo}</p>
-                      <p>Area: Escuela piso 1</p>
-                      <p>Max: 5 personas por mesa</p>
-                    </div>
-
-                    {selectedReserva.tipo === "Multiple" && (
-                      <div className="mesa-grid">
-
-                        <button className="mesa-btn">1</button>
-                        <button className="mesa-btn">2</button>
-                        <button className="mesa-btn selected">
-                          3
-                        </button>
-
-                        <button className="mesa-btn">5</button>
-                        <button className="mesa-btn">6</button>
-                        <button className="mesa-btn">7</button>
-
-                      </div>
-                    )}
 
                   </div>
 
@@ -259,18 +335,26 @@ export default function Dashboard() {
                     <h3>Resumen</h3>
 
                     <div className="summary-item">
-                      Mesa 3
+                      {selectedReserva.sala}
                     </div>
 
                     <div className="summary-item">
-                      Bloque B
+                      {selectedTimeSlot || "Selecciona un bloque"}
                     </div>
 
                     <div className="summary-item">
-                      20 abril
+                      {fecha || selectedReserva.fecha}
                     </div>
 
-                    <button className="reserve-btn" onClick={handleReservar}>
+                    <div className="summary-item summary-item--small">
+                      {selectedReserva.nombre}
+                    </div>
+
+                    <button
+                      className="reserve-btn"
+                      onClick={handleReservar}
+                      disabled={!selectedTimeSlot}
+                    >
                       Reservar
                     </button>
 

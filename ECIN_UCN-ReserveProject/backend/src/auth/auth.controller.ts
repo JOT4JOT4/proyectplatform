@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
@@ -25,10 +25,30 @@ export class AuthController {
   @UseGuards(AuthGuard('google-web'))
   async googleWebAuthRedirect(@Req() req, @Res() res: Response) {
     const loginData = await this.authService.googleLogin(req);
+    const code = this.authService.createLoginCode(loginData);
 
     return res.redirect(
-      `http://localhost:5173/auth/callback?token=${loginData.access_token}`,
+      `http://localhost:5173/auth/callback?code=${code}`,
     );
+  }
+
+  @Get('google/mobile')
+  @UseGuards(AuthGuard('google-mobile'))
+  async googleMobileAuth(@Req() req) {}
+
+  @Get('google/mobile/callback')
+  @UseGuards(AuthGuard('google-mobile'))
+  async googleMobileAuthRedirect(@Req() req, @Res() res: Response) {
+    const loginData = await this.authService.googleLogin(req);
+    const code = this.authService.createLoginCode(loginData);
+    const callbackUrl = process.env.MOBILE_AUTH_CALLBACK_URL || 'reservasucn://auth/callback';
+
+    return res.redirect(`${callbackUrl}?code=${code}`);
+  }
+
+  @Post('exchange')
+  exchange(@Body('code') code: string) {
+    return this.authService.exchangeLoginCode(code);
   }
 
   @Get('logout')
