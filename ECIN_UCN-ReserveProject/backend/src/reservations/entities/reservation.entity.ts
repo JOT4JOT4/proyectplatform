@@ -3,6 +3,7 @@ import { Space } from '../../spaces/entities/space.entity';
 import { User } from '../../users/entities/user.entity'; 
 
 export enum ReservationStatus {
+  PENDING = 'pending',
   ACTIVE = 'active',
   CANCELLED = 'cancelled',
   COMPLETED = 'completed'
@@ -22,7 +23,7 @@ export class Reservation {
   @Column({ type: 'time' })
   endTime: string; // Formato HH:mm
 
-  @Column({ type: 'enum', enum: ReservationStatus, default: ReservationStatus.ACTIVE })
+  @Column({ type: 'enum', enum: ReservationStatus, default: ReservationStatus.PENDING })
   status: ReservationStatus;
 
   // RELACIONES

@@ -1,4 +1,4 @@
-import { IsString, IsDateString, Matches, IsUUID } from 'class-validator';
+import { IsString, IsDateString, Matches, IsUUID, IsOptional } from 'class-validator';
 
 export class CreateReservationDto {
   @IsUUID()
@@ -14,4 +14,8 @@ export class CreateReservationDto {
   @IsString()
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'endTime debe tener formato HH:mm (ej: 10:00)' })
   endTime: string;
+
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 }

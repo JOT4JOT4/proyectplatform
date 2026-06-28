@@ -7,9 +7,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SpacesModule } from './spaces/spaces.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
-  imports: [UsersModule, AuthModule,ConfigModule.forRoot({isGlobal: true,}),
+  imports: [
+    UsersModule, 
+    AuthModule,
+    ConfigModule.forRoot({isGlobal: true,}),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -26,6 +30,7 @@ import { ReservationsModule } from './reservations/reservations.module';
     }),
     SpacesModule,
     ReservationsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

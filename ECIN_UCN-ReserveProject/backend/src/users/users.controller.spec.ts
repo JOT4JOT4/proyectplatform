@@ -6,9 +6,23 @@ describe('UsersController', () => {
   let controller: UsersController;
 
   beforeEach(async () => {
+    const mockUsersService = {
+      findOrCreate: jest.fn(),
+      createPenalty: jest.fn(),
+      getPenalties: jest.fn(),
+      createWarning: jest.fn(),
+      getWarnings: jest.fn(),
+      findOne: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
-      providers: [UsersService],
+      providers: [
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
+        },
+      ],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
