@@ -1,20 +1,77 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { apiGet, ApiError } from '../services/apiClient';
+import type { ReservationRecord, Space, SpacesResponse } from '../services/apiTypes';
 
-import { API_URL } from '../config/environment';
+function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: Space[] }): Space[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
 
-const highlights = [
-  {
-    title: 'Reservar',
-    description: 'Abajo encontrarás la pantalla para reservar salas, con selección de fecha, hora y espacio.',
-  },
-  {
-    title: 'Historial',
-    description: 'Ofrecemos una pantalla de historial para revisar tus reservas pasadas y futuras, con detalles de cada una.',
-  },
-];
+  if ('data' in response && Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  return [];
+}
 
 export function HomeScreen() {
+  const { token, user } = useAuth();
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [reservations, setReservations] = useState<ReservationRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || !user?.id) {
+      setSpaces([]);
+      setReservations([]);
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const [spacesResponse, reservationsResponse] = await Promise.all([
+          apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=8', token),
+          apiGet<ReservationRecord[]>(`/reservations/user/${user.id}`, token),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setSpaces(normalizeSpacesResponse(spacesResponse).filter((space) => space.isActive !== false));
+        setReservations(Array.isArray(reservationsResponse) ? reservationsResponse : []);
+      } catch (requestError) {
+        if (active) {
+          const message = requestError instanceof ApiError ? requestError.message : 'No se pudo cargar el tablero desde el backend.';
+          setError(message);
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [token, user?.id]);
+
+  const upcomingReservations = reservations.filter((reservation) => reservation.status !== 'cancelled');
+  const activeSpacesCount = spaces.length;
+  const activeReservationsCount = upcomingReservations.length;
+  const latestReservation = upcomingReservations[0] ?? null;
+  const featuredSpaces = spaces.slice(0, 3);
+
   return (
     <View style={styles.background}>
       <View style={styles.glowTop} />
@@ -23,33 +80,60 @@ export function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>ECIN RESERVAS UCN</Text>
-            <Text style={styles.sectionSubtitle}>Aplicación para la reserva de espacios en la escuela de ingeniería </Text>
-          </View>
-
-          {highlights.map((item) => (
-            <View key={item.title} style={styles.highlightCard}>
-              <Text style={styles.highlightTitle}>{item.title}</Text>
-              <Text style={styles.highlightDescription}>{item.description}</Text>
+          <View style={styles.heroCard}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Dashboard real</Text>
             </View>
-          ))}
-          <View style={styles.footerCard}>
-            <Text style={styles.footerTitle}>Preguntas Fecuentes</Text>
-            <Text style={styles.footerText}>
-              ¿Que hago después de reservar?{'\n'}
-              una ves reservada, recibirás un correo de confirmación con el detalle de tu reserva, simplemente dirigete a la sala, esta esperará abierta{'\n'}
-              ¿Que hago después de reservar?{'\n'}
-              una ves reservada, recibirás un correo de confirmación con el detalle de tu reserva, simplemente dirigete a la sala, esta esperará abierta{'\n'}
+            <Text style={styles.title}>Hola{user?.firstName ? `, ${user.firstName}` : ''}</Text>
+            <Text style={styles.subtitle}>
+              Aquí ves espacios y reservas consultados directamente desde el backend, sin datos de prueba.
             </Text>
+
+            <View style={styles.metricRow}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Espacios</Text>
+                <Text style={styles.metricValue}>{activeSpacesCount}</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Reservas</Text>
+                <Text style={styles.metricValue}>{activeReservationsCount}</Text>
+              </View>
+            </View>
           </View>
+
+          {isLoading ? <ActivityIndicator color="#003057" /> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Reserva más reciente</Text>
+            {latestReservation ? (
+              <>
+                <Text style={styles.sectionBody}>{latestReservation.space?.name ?? 'Espacio reservado'}</Text>
+                <Text style={styles.sectionMeta}>
+                  {latestReservation.date} • {latestReservation.startTime} - {latestReservation.endTime} • {latestReservation.status}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.sectionBody}>Todavía no tienes reservas activas.</Text>
+            )}
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Espacios destacados</Text>
+            {featuredSpaces.length > 0 ? featuredSpaces.map((space) => (
+              <View key={space.id} style={styles.spaceCard}>
+                <Text style={styles.spaceTitle}>{space.name}</Text>
+                <Text style={styles.spaceMeta}>{space.zone} • {space.type}</Text>
+                {space.description ? <Text style={styles.spaceDescription}>{space.description}</Text> : null}
+              </View>
+            )) : <Text style={styles.sectionBody}>No hay espacios disponibles para mostrar.</Text>}
+          </View>
+
           <View style={styles.footerCard}>
             <Text style={styles.footerTitle}>Soporte</Text>
             <Text style={styles.footerText}>
               Telefono: +56 9 1234 5678{'\n'}
-              Email: soporte@ucn.cl {'\n'}
+              Email: soporte@ucn.cl{'\n'}
             </Text>
           </View>
         </ScrollView>
@@ -116,7 +200,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    fontFamily: 'MyriadPro-regular',
   },
   title: {
     color: '#ffffff',
@@ -124,79 +207,77 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontWeight: '800',
     letterSpacing: -0.6,
-    fontFamily: 'MyriadPro-regular',
   },
   subtitle: {
     color: '#ffffff',
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: 'MyriadPro-regular',
   },
-  endpointCard: {
-    marginTop: 6,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#003057',
-    borderWidth: 1,
-    borderColor: '#00182b',
-    gap: 6,
+  metricRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  endpointLabel: {
-    color: '#ffffff',
+  metricCard: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: '#ffffff',
+  },
+  metricLabel: {
+    color: '#3D4B63',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    fontFamily: 'MyriadPro-regular',
   },
-  endpointValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  metricValue: {
+    color: '#081026',
+    fontSize: 28,
     fontWeight: '700',
-    fontFamily: 'MyriadPro-regular',
   },
-  endpointHint: {
-    color: '#ffffff',
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'MyriadPro-regular',
+  errorText: {
+    color: '#b42318',
   },
-  sectionHeader: {
-    paddingTop: 8,
-    gap: 4,
+  sectionCard: {
+    backgroundColor: '#003057',
+    borderRadius: 22,
+    padding: 18,
+    gap: 8,
   },
   sectionTitle: {
     color: '#F7FAFF',
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    fontFamily: 'MyriadPro-regular',
-  },
-  sectionSubtitle: {
-    color: '#AAB7CE',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MyriadPro-regular',
-  },
-  highlightCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 22,
-    padding: 16,
-    gap: 8,
-  },
-  highlightTitle: {
-    color: '#F7FAFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'MyriadPro-regular',
   },
-  highlightDescription: {
+  sectionBody: {
     color: '#ffffff',
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: 'MyriadPro-regular',
+  },
+  sectionMeta: {
+    color: '#CFE4FF',
+    fontSize: 13,
+  },
+  spaceCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 8,
+  },
+  spaceTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  spaceMeta: {
+    color: '#CFE4FF',
+    marginTop: 4,
+    fontSize: 12,
+  },
+  spaceDescription: {
+    color: '#ffffff',
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
   },
   footerCard: {
     marginTop: 4,
@@ -211,12 +292,10 @@ const styles = StyleSheet.create({
     color: '#F7FAFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'MyriadPro-regular',
   },
   footerText: {
     color: '#D2DCEB',
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: 'MyriadPro-regular',
   },
 });
