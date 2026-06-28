@@ -2,38 +2,35 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { apiGet, ApiError } from '../services/apiClient';
-import type { HistorialReserva } from '../services/apiTypes';
-
-const HISTORY: HistorialReserva[] = [
-  { id: 'h1', title: 'Sala A - 2026-04-20', status: 'Completada' },
-  { id: 'h2', title: 'Sala B - 2026-04-30', status: 'Pendiente' },
-];
+import type { ReservationRecord } from '../services/apiTypes';
 
 export default function HistorialScreen() {
-  const { token } = useAuth();
-  const [items, setItems] = React.useState<HistorialReserva[]>(HISTORY);
+  const { token, user } = useAuth();
+  const [items, setItems] = React.useState<ReservationRecord[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!token || !user?.id) {
+      setItems([]);
+      return;
+    }
+
     let active = true;
 
     (async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await apiGet<HistorialReserva[]>('/historial', token);
-
-        if (active && Array.isArray(data) && data.length > 0) {
-          setItems(data);
-        }
-      } catch (requestError) {
-        if (requestError instanceof ApiError && requestError.status === 404) {
-          return;
-        }
+        const data = await apiGet<ReservationRecord[]>(`/reservations/user/${user.id}`, token);
 
         if (active) {
-          setError('Se muestra historial de ejemplo mientras el backend no expone /historial.');
+          setItems(Array.isArray(data) ? data : []);
+        }
+      } catch (requestError) {
+        if (active) {
+          const message = requestError instanceof ApiError ? requestError.message : 'No se pudo cargar el historial desde el backend.';
+          setError(message);
         }
       } finally {
         if (active) {
@@ -45,21 +42,27 @@ export default function HistorialScreen() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, user?.id]);
 
   return (
     <View style={styles.container}>
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
+
       <Text style={styles.header}>Historial de reservas</Text>
-      {isLoading ? <Text style={styles.note}>Cargando historial autenticado...</Text> : null}
+      <Text style={styles.subheader}>Tus reservas reales consultadas desde el backend.</Text>
+
+      {isLoading ? <Text style={styles.note}>Cargando historial...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}
+
       <FlatList
         data={items}
-        keyExtractor={(i) => i.id}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={<Text style={styles.emptyState}>Aún no tienes reservas registradas.</Text>}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.rowTitle}>{item.title}</Text>
+            <Text style={styles.rowTitle}>{item.space?.name ?? 'Espacio reservado'}</Text>
+            <Text style={styles.rowMeta}>{item.date} • {item.startTime} - {item.endTime}</Text>
             <Text style={styles.rowStatus}>{item.status}</Text>
           </View>
         )}
@@ -72,13 +75,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#081026',
-  },
-  header: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 12,
+    backgroundColor: '#ffffff',
   },
   glowTop: {
     position: 'absolute',
@@ -87,7 +84,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 180,
-    backgroundColor: 'rgba(88, 160, 255, 0.18)',
+    backgroundColor: '#003057',
   },
   glowBottom: {
     position: 'absolute',
@@ -96,27 +93,44 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 220,
-    backgroundColor: 'rgba(110, 231, 183, 0.12)',
+    backgroundColor: '#003057',
+  },
+  header: {
+    color: '#003057',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  subheader: {
+    color: '#3D4B63',
+    marginBottom: 14,
   },
   note: {
     color: '#A8B4C8',
     marginBottom: 10,
   },
+  emptyState: {
+    color: '#3D4B63',
+    marginTop: 12,
+  },
   row: {
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#003057',
+    marginBottom: 12,
   },
   rowTitle: {
-    color: '#EAF2FF',
-    fontWeight: '700',
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  rowMeta: {
+    color: '#CFE4FF',
+    marginTop: 6,
   },
   rowStatus: {
+    color: '#fff',
     marginTop: 6,
-    color: '#A8B4C8',
-    fontSize: 13,
+    fontWeight: '700',
   },
 });

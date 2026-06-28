@@ -3,6 +3,7 @@
     "name": "movil",
     "slug": "movil",
     "version": "1.0.0",
+    "scheme": "reservasucn",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

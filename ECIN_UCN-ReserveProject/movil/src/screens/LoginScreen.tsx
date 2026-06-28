@@ -1,72 +1,57 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { useAuth } from '../contexts/AuthContext';
-import { GOOGLE_AUTH_CALLBACK_URL, GOOGLE_AUTH_URL } from '../config/environment';
+import { apiPost, ApiError } from '../services/apiClient';
+import { GOOGLE_AUTH_URL } from '../config/environment';
+import type { AuthExchangeResponse } from '../services/apiTypes';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const ENABLE_MOCK_AUTH = true;
-const MOCK_USER = {
-  email: 'demo@ucn.cl',
-  firstName: 'Usuario',
-  lastName: 'Demo',
-  picture: undefined,
-  role: 'student',
-  id: 0,
-};
-
-const MOCK_TOKEN = 'demo-token';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [isSigningIn, setIsSigningIn] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!ENABLE_MOCK_AUTH) {
-      return;
-    }
-
-    let active = true;
-
-    (async () => {
-      setIsSigningIn(true);
-      await signIn(MOCK_USER, MOCK_TOKEN);
-
-      if (active) {
-        setIsSigningIn(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [signIn]);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
-    if (ENABLE_MOCK_AUTH) {
-      await signIn(MOCK_USER, MOCK_TOKEN);
-      return;
-    }
-
     try {
+      setError(null);
       setIsSigningIn(true);
-      const result = await WebBrowser.openAuthSessionAsync(GOOGLE_AUTH_URL, GOOGLE_AUTH_CALLBACK_URL);
+
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'reservasucn',
+        path: 'auth/callback',
+      });
+
+      const result = await WebBrowser.openAuthSessionAsync(GOOGLE_AUTH_URL, redirectUri);
 
       if (result.type !== 'success' || !result.url) {
         return;
       }
 
-      const response = await fetch(result.url);
-      const payload = await response.json();
+      const callbackUrl = new URL(result.url);
+      const code = callbackUrl.searchParams.get('code');
 
-      if (!response.ok || !payload?.access_token || !payload?.user) {
+      if (!code) {
+        throw new Error('No se recibió el código de autenticación.');
+      }
+
+      const payload = await apiPost<AuthExchangeResponse>('/auth/exchange', { code });
+
+      if (!payload?.access_token || !payload?.user) {
         throw new Error(payload?.message ?? 'No se pudo completar el inicio de sesión');
       }
 
       await signIn(payload.user, payload.access_token);
-    } catch (error) {
-      console.warn('Failed to complete backend Google login', error);
+    } catch (signInError) {
+      const message = signInError instanceof ApiError
+        ? signInError.message
+        : signInError instanceof Error
+          ? signInError.message
+          : 'No se pudo iniciar sesión';
+      setError(message);
+      console.warn('Failed to complete backend Google login', signInError);
     } finally {
       setIsSigningIn(false);
     }
@@ -74,18 +59,17 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bienvenido a Reservas UCN</Text>
-      <Text style={styles.subtitle}>Identifícate con Google para continuar</Text>
+      <View style={styles.card}>
+        <Text style={styles.kicker}>Reservas UCN</Text>
+        <Text style={styles.title}>Acceso seguro</Text>
+        <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios reales del backend.</Text>
 
-      {ENABLE_MOCK_AUTH ? <Text style={styles.hint}>Modo demo activo: acceso automático temporal para probar la navegación.</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
-        {isSigningIn ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Iniciar sesión con Google</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
+          {isSigningIn ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continuar con Google</Text>}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -93,35 +77,47 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#0A1120',
+    backgroundColor: '#003057',
   },
-  title: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '800',
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+  },
+  kicker: {
+    color: '#0059e9',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: 8,
   },
+  title: {
+    color: '#081026',
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
   subtitle: {
-    color: '#ffffff',
-    marginBottom: 24,
-    textAlign: 'center',
+    color: '#3D4B63',
+    fontSize: 15,
+    lineHeight: 21,
+    marginBottom: 18,
+  },
+  error: {
+    color: '#b42318',
+    marginBottom: 14,
   },
   button: {
-    backgroundColor: '#adc1e6',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#0059e9',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   buttonText: {
-    color: '#000000',
+    color: '#fff',
     fontWeight: '700',
-  },
-  hint: {
-    marginTop: 12,
-    color: '#adc1e6',
-    fontSize: 12,
   },
 });
