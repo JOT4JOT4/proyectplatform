@@ -1,9 +1,10 @@
+import { getApiUrl } from "../config";
 import "../css/login.css";
 
 export default function Login() {
     
     const handleLogin = () => {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const apiUrl = getApiUrl();
         window.location.href = `${apiUrl}/auth/google/web`;
     };
 
