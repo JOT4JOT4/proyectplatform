@@ -3,7 +3,8 @@ import "../css/login.css";
 export default function Login() {
     
     const handleLogin = () => {
-        window.location.href = "http://localhost:3000/auth/google/web";
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        window.location.href = `${apiUrl}/auth/google/web`;
     };
 
     return (
