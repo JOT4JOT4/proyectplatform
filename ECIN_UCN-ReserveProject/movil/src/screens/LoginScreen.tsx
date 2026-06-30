@@ -51,7 +51,7 @@ export default function LoginScreen() {
           ? signInError.message
           : 'No se pudo iniciar sesión';
       setError(message);
-      console.warn('Failed to complete backend Google login', signInError);
+      console.warn('Failed to complete Google login', signInError);
     } finally {
       setIsSigningIn(false);
     }
@@ -60,9 +60,9 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.kicker}>Reservas UCN</Text>
+        <Text style={styles.kicker}>Reserva de espacios UCN</Text>
         <Text style={styles.title}>Acceso seguro</Text>
-        <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios reales del backend.</Text>
+        <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 

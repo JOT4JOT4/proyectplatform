@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  ScrollView,
-  Alert,
+import {  View,  Text,  StyleSheet,  FlatList,  TouchableOpacity,  Modal, Pressable,  ScrollView,  Alert,  Image,
 } from 'react-native';
 import dayjs from 'dayjs';
 import DateTimePicker from 'react-native-ui-datepicker';
@@ -56,6 +47,10 @@ function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: S
 
 function overlaps(slot: TimeSlot, occupied: OccupiedSlot) {
   return slot.startTime < occupied.endTime && slot.endTime > occupied.startTime;
+}
+
+function getSlotLabel(slot: TimeSlot | null) {
+  return slot?.label ?? 'Sin bloque seleccionado';
 }
 
 export default function ReservasScreen() {
@@ -146,6 +141,9 @@ export default function ReservasScreen() {
 
   const uniqueZones = React.useMemo(() => Array.from(new Set(spaces.map((space) => space.zone).filter(Boolean))).sort(), [spaces]);
   const uniqueTypes = React.useMemo(() => Array.from(new Set(spaces.map((space) => space.type).filter(Boolean))).sort(), [spaces]);
+  const availableSlotsCount = React.useMemo(() => {
+    return TIME_SLOTS.filter((slot) => !availability.ocupiedSlots.some((occupied) => overlaps(slot, occupied))).length;
+  }, [availability.ocupiedSlots]);
 
   const openSpaceDetail = (space: Space) => {
     setSelectedSpace(space);
@@ -247,47 +245,94 @@ export default function ReservasScreen() {
       <Modal visible={showSpaceModal} transparent animationType="slide">
         <View style={styles.modalWrap}>
           <View style={styles.modalCardLarge}>
-            <Text style={styles.modalTitle}>{selectedSpace?.name ?? 'Detalle del espacio'}</Text>
-            <Text style={styles.detailLine}>{selectedSpace?.zone ?? '—'} • {selectedSpace?.type ?? '—'}</Text>
-            <Text style={styles.detailLine}>Capacidad: {selectedSpace?.capacity ?? 0}</Text>
-            {selectedSpace?.description ? <Text style={styles.detailDescription}>{selectedSpace.description}</Text> : null}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              <View style={styles.heroCard}>
+                {selectedSpace?.imageUrl ? (
+                  <Image source={{ uri: selectedSpace.imageUrl }} style={styles.heroImage} />
+                ) : (
+                  <View style={styles.heroImageFallback}>
+                    <Text style={styles.heroImageFallbackText}>Espacio</Text>
+                  </View>
+                )}
 
-            <Text style={styles.sectionLabel}>Horarios ocupados</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
-              {availability.ocupiedSlots.length > 0 ? availability.ocupiedSlots.map((slot, index) => (
-                <View key={`${slot.startTime}-${slot.endTime}-${index}`} style={styles.occupiedSlot}>
-                  <Text style={styles.occupiedSlotText}>{slot.startTime} - {slot.endTime}</Text>
+                <Text style={styles.modalTitle}>{selectedSpace?.name ?? 'Detalle del espacio'}</Text>
+                <Text style={styles.detailLine}>{selectedSpace?.zone ?? '—'} • {selectedSpace?.type ?? '—'}</Text>
+
+                <View style={styles.badgeRow}>
+                  <View style={styles.badge}><Text style={styles.badgeText}>Capacidad {selectedSpace?.capacity ?? 0}</Text></View>
+                  <View style={styles.badge}><Text style={styles.badgeText}>{selectedSpace?.subspaces?.length ?? 0} subespacios</Text></View>
                 </View>
-              )) : <Text style={styles.emptyInline}>No hay bloques ocupados para esta fecha.</Text>}
+              </View>
+
+              <View style={styles.summaryCard}>
+                <Text style={styles.sectionTitle}>Detalle de la reserva</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Fecha</Text>
+                  <Text style={styles.summaryValue}>{selectedDate.format('DD/MM/YYYY')}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Bloque</Text>
+                  <Text style={styles.summaryValue}>{getSlotLabel(selectedSlot)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Disponibles</Text>
+                  <Text style={styles.summaryValue}>{availableSlotsCount} bloques libres</Text>
+                </View>
+              </View>
+
+              {selectedSpace?.description ? (
+                <View style={styles.infoCard}>
+                  <Text style={styles.sectionTitle}>Descripción</Text>
+                  <Text style={styles.detailDescription}>{selectedSpace.description}</Text>
+                </View>
+              ) : null}
+
+              {selectedSpace?.subspaces?.length ? (
+                <View style={styles.infoCard}>
+                  <Text style={styles.sectionTitle}>Subespacios asociados</Text>
+                  <Text style={styles.subspaceText} numberOfLines={3}>
+                    {selectedSpace.subspaces.map((subspace) => subspace.name).join(' · ')}
+                  </Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.sectionLabel}>Horarios ocupados</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
+                {availability.ocupiedSlots.length > 0 ? availability.ocupiedSlots.map((slot, index) => (
+                  <View key={`${slot.startTime}-${slot.endTime}-${index}`} style={styles.occupiedSlot}>
+                    <Text style={styles.occupiedSlotText}>{slot.startTime} - {slot.endTime}</Text>
+                  </View>
+                )) : <Text style={styles.emptyInline}>No hay bloques ocupados para esta fecha.</Text>}
+              </ScrollView>
+
+              <Text style={styles.sectionLabel}>Bloque a reservar</Text>
+              <View style={styles.slotGrid}>
+                {TIME_SLOTS.map((slot) => {
+                  const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
+                  const selected = selectedSlot?.code === slot.code;
+
+                  return (
+                    <TouchableOpacity
+                      key={slot.code}
+                      style={[styles.slotButton, occupied && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                      onPress={() => !occupied && setSelectedSlot(slot)}
+                      disabled={occupied}
+                    >
+                      <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>{slot.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.secondaryButton} onPress={closeSpaceModal}>
+                  <Text style={styles.secondaryButtonText}>Cerrar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.primaryButton} onPress={handleConfirmReservation}>
+                  <Text style={styles.primaryButtonText}>Reservar</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-
-            <Text style={styles.sectionLabel}>Bloque a reservar</Text>
-            <View style={styles.slotGrid}>
-              {TIME_SLOTS.map((slot) => {
-                const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
-                const selected = selectedSlot?.code === slot.code;
-
-                return (
-                  <TouchableOpacity
-                    key={slot.code}
-                    style={[styles.slotButton, occupied && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                    onPress={() => !occupied && setSelectedSlot(slot)}
-                    disabled={occupied}
-                  >
-                    <Text style={styles.slotButtonText}>{slot.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={closeSpaceModal}>
-                <Text style={styles.secondaryButtonText}>Cerrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButton} onPress={handleConfirmReservation}>
-                <Text style={styles.primaryButtonText}>Reservar</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
@@ -395,6 +440,34 @@ const styles = StyleSheet.create({
     padding: 18,
     maxHeight: '90%',
   },
+  modalScrollContent: {
+    paddingBottom: 4,
+  },
+  heroCard: {
+    marginBottom: 14,
+  },
+  heroImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    marginBottom: 14,
+    backgroundColor: '#E6EEF8',
+  },
+  heroImageFallback: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    marginBottom: 14,
+    backgroundColor: '#003057',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroImageFallbackText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   modalTitle: {
     color: '#081026',
     fontSize: 20,
@@ -409,6 +482,56 @@ const styles = StyleSheet.create({
     color: '#081026',
     marginTop: 10,
     lineHeight: 20,
+  },
+  infoCard: {
+    backgroundColor: '#F5F8FC',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+  },
+  summaryCard: {
+    backgroundColor: '#EAF2FF',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    color: '#081026',
+    fontWeight: '800',
+    marginBottom: 10,
+    fontSize: 15,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    color: '#3D4B63',
+    fontWeight: '700',
+  },
+  summaryValue: {
+    color: '#081026',
+    fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  badge: {
+    backgroundColor: '#F5F8FC',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  badgeText: {
+    color: '#003057',
+    fontWeight: '700',
+    fontSize: 12,
   },
   sectionLabel: {
     color: '#0059e9',
@@ -455,6 +578,13 @@ const styles = StyleSheet.create({
     color: '#081026',
     fontSize: 12,
     fontWeight: '700',
+  },
+  slotButtonTextSelected: {
+    color: '#fff',
+  },
+  subspaceText: {
+    color: '#3D4B63',
+    lineHeight: 20,
   },
   modalActions: {
     flexDirection: 'row',
