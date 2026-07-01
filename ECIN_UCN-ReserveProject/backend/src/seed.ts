@@ -14,13 +14,6 @@ async function bootstrap() {
 
   console.log('Iniciando el sembrado de la base de datos...');
 
-  const queryRunner = dataSource.createQueryRunner();
-  await queryRunner.connect();
-  
-  console.log('Limpiando base de datos anterior...');
-  // Limpiamos todas las tablas en orden para evitar conflictos de claves foráneas
-  await queryRunner.query('TRUNCATE TABLE reservations, space_blocks, user_penalties, user_warnings, spaces, users, block_configs, admin_settings CASCADE;');
-
   // Repositorios
   const userRepository = dataSource.getRepository(User);
   const spaceRepository = dataSource.getRepository(Space);
@@ -28,6 +21,22 @@ async function bootstrap() {
   const adminSettingRepository = dataSource.getRepository(AdminSetting);
   const reservationRepository = dataSource.getRepository(Reservation);
   const spaceBlockRepository = dataSource.getRepository(SpaceBlock);
+
+  // Verificar si la base de datos ya contiene datos
+  const userCount = await userRepository.count();
+  const spaceCount = await spaceRepository.count();
+
+  if (userCount > 0 || spaceCount > 0) {
+    console.log('La base de datos ya contiene datos (usuarios o espacios). Omitiendo el sembrado.');
+    await app.close();
+    return;
+  }
+
+  const queryRunner = dataSource.createQueryRunner();
+  await queryRunner.connect();
+
+  console.log('Limpiando base de datos anterior...');
+  await queryRunner.query('TRUNCATE TABLE reservations, space_blocks, user_penalties, user_warnings, spaces, users, block_configs, admin_settings CASCADE;');
 
   // 1. Crear Ajustes Administrativos (AdminSettings)
   console.log('Sembrando configuraciones administrativas...');
@@ -55,7 +64,7 @@ async function bootstrap() {
     role: UserRole.ADMIN,
     picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150'
   });
-  
+
   const regularUser1 = userRepository.create({
     email: 'juan.perez@alumnos.ucn.cl',
     firstName: 'Juan',
@@ -83,7 +92,7 @@ async function bootstrap() {
     { name: 'Sala de Estudio 101', zone: 'Biblioteca - Piso 1', type: SpaceType.ROOM, capacity: 6, description: 'Sala de estudio grupal equipada con pizarra acrílica, TV de 50 pulgadas y puertos HDMI.', imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80', isActive: true },
     { name: 'Sala de Estudio 102', zone: 'Biblioteca - Piso 1', type: SpaceType.ROOM, capacity: 4, description: 'Sala ideal para estudio grupal silencioso, equipada con mesa redonda y enchufes.', imageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80', isActive: true },
     { name: 'Sala de Reuniones A', zone: 'Pabellón K', type: SpaceType.ROOM, capacity: 10, description: 'Sala de reuniones formal para proyectos de investigación. Cuenta con pizarra acrílica y proyector de alta definición.', imageUrl: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&w=800&q=80', isActive: true },
-    
+
     // Mesas
     { name: 'Mesa de Trabajo A1', zone: 'Biblioteca - Central', type: SpaceType.TABLE, capacity: 4, description: 'Mesa abierta con iluminación dedicada y 4 conexiones eléctricas y USB independientes.', imageUrl: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?auto=format&fit=crop&w=800&q=80', isActive: true },
     { name: 'Mesa de Trabajo A2', zone: 'Biblioteca - Central', type: SpaceType.TABLE, capacity: 4, description: 'Mesa de trabajo compartida y abierta en el ala central de biblioteca.', imageUrl: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=800&q=80', isActive: true },
@@ -101,7 +110,7 @@ async function bootstrap() {
   console.log('Sembrando reservas de prueba...');
   const today = new Date();
   const formatToDateString = (d: Date) => d.toISOString().split('T')[0];
-  
+
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
 
