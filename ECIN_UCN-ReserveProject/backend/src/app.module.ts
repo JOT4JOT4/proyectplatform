@@ -17,16 +17,33 @@ import { MailModule } from './mail/mail.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres', 
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USER'),
-        password: configService.get<string>('DB_PASS'),
-        database: configService.get<string>('DB_NAME'),
-        autoLoadEntities: true,
-        synchronize: true, 
-      }),
+      useFactory: (configService: ConfigService) => {
+        const url = configService.get<string>('DATABASE_URL');
+        const isProd = configService.get<string>('NODE_ENV') === 'production';
+        const ssl = configService.get<string>('DB_SSL') === 'true' || isProd;
+
+        if (url) {
+          return {
+            type: 'postgres',
+            url,
+            autoLoadEntities: true,
+            synchronize: true,
+            ssl: ssl ? { rejectUnauthorized: false } : false,
+          };
+        }
+
+        return {
+          type: 'postgres',
+          host: configService.get<string>('DB_HOST') || 'localhost',
+          port: configService.get<number>('DB_PORT') || 5432,
+          username: configService.get<string>('DB_USER') || 'postgres',
+          password: configService.get<string>('DB_PASS') || 'postgres',
+          database: configService.get<string>('DB_NAME') || 'postgres',
+          autoLoadEntities: true,
+          synchronize: true,
+          ssl: ssl ? { rejectUnauthorized: false } : false,
+        };
+      },
     }),
     SpacesModule,
     ReservationsModule,

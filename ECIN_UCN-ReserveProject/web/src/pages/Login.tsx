@@ -1,9 +1,10 @@
+import { getApiUrl } from "../config";
 import "../css/login.css";
 
 export default function Login() {
     
     const handleLogin = () => {
-        window.location.href = "http://localhost:3000/auth/google/web";
+        window.location.href = `${getApiUrl()}/auth/google/web`;
     };
 
     return (

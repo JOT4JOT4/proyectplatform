@@ -62,6 +62,12 @@ type AvailabilityResponse = {
   timezone: string;
   ocupiedSlots?: unknown[];
   occupiedSlots?: unknown[];
+  divisions?: number;
+};
+
+type OccupiedTimeRange = {
+  startTime: string;
+  endTime: string;
 };
 
 type TimeBlock = {
@@ -127,35 +133,99 @@ function mapSpaceToReserva(space: Space): Reserva {
   };
 }
 
-function normalizarBloquesOcupados(slots: unknown[] = []) {
+function formatTimeWithoutSeconds(timeStr?: string): string {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  if (parts.length >= 2) {
+    return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+  }
+  return timeStr;
+}
+
+function mapBackendReservationToReservaGuardada(res: any): ReservaGuardada {
+  const space = res.space || {};
+  const start = formatTimeWithoutSeconds(res.startTime);
+  const end = formatTimeWithoutSeconds(res.endTime);
+
+  const bloqueCoincidente = BLOQUES_DISPONIBLES.find(
+    (bloque) => bloque.startTime === start && bloque.endTime === end,
+  );
+  const horarioReservado = bloqueCoincidente ? bloqueCoincidente.name : `${start} - ${end}`;
+
+  return {
+    id: space.id || "",
+    sala: space.name || "Espacio",
+    nombre: space.description || "Reserva de espacio",
+    tipo: space.type === "room" ? "Sala" : "Mesa",
+    area: space.zone || "",
+    ubicacion: space.zone || "",
+    descripcion: space.description || "Sin descripción registrada.",
+    capacidad: space.capacity || 0,
+    equipamiento: [],
+    reglas: [],
+    horariosDisponibles: BLOQUES_DISPONIBLES.map((bloque) => bloque.name),
+    fecha: res.date,
+    horario: horarioReservado,
+    imagen: space.imageUrl || (space.name === "EIC 102" ? sala2 : sala1),
+    fechaReservada: res.date,
+    horarioReservado: horarioReservado,
+  };
+}
+
+function normalizarBloquesOcupados(slots: unknown[] = []): OccupiedTimeRange[] {
   return slots
     .map((slot) => {
-      if (typeof slot === "string") return slot;
-
       if (slot && typeof slot === "object") {
         const item = slot as {
-          block?: string;
-          label?: string;
-          name?: string;
           startTime?: string;
           endTime?: string;
         };
-
-        if (item.block || item.label || item.name) {
-          return item.block || item.label || item.name || "";
+        if (item.startTime && item.endTime) {
+          return {
+            startTime: formatTimeWithoutSeconds(item.startTime),
+            endTime: formatTimeWithoutSeconds(item.endTime),
+          };
         }
-
-        const bloqueCoincidente = BLOQUES_DISPONIBLES.find(
-          (bloque) =>
-            bloque.startTime === item.startTime && bloque.endTime === item.endTime,
-        );
-
-        return bloqueCoincidente?.name || "";
       }
-
-      return "";
+      return null;
     })
-    .filter(Boolean);
+    .filter((x): x is OccupiedTimeRange => x !== null);
+}
+
+function getSubBlocks(baseBlock: TimeBlock, divisions: number): TimeBlock[] {
+  if (divisions <= 1) return [baseBlock];
+
+  const [startH, startM] = baseBlock.startTime.split(":").map(Number);
+  const [endH, endM] = baseBlock.endTime.split(":").map(Number);
+
+  const startTotalMinutes = startH * 60 + startM;
+  const endTotalMinutes = endH * 60 + endM;
+  const totalDuration = endTotalMinutes - startTotalMinutes;
+
+  const slotDuration = Math.floor(totalDuration / divisions);
+  const subBlocks: TimeBlock[] = [];
+
+  for (let i = 0; i < divisions; i++) {
+    const slotStartTotal = startTotalMinutes + i * slotDuration;
+    const slotEndTotal = slotStartTotal + slotDuration;
+
+    const formatTime = (totalMin: number) => {
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    };
+
+    const startTime = formatTime(slotStartTotal);
+    const endTime = formatTime(slotEndTotal);
+
+    subBlocks.push({
+      name: `${baseBlock.name} - Sub ${i + 1}`,
+      startTime,
+      endTime,
+    });
+  }
+
+  return subBlocks;
 }
 
 function obtenerFechaHoy() {
@@ -180,11 +250,37 @@ export default function Dashboard() {
 
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
-  const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
+  const [selectedBaseBlock, setSelectedBaseBlock] = useState("");
+  const [occupiedSlots, setOccupiedSlots] = useState<OccupiedTimeRange[]>([]);
+  const [divisions, setDivisions] = useState(1);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
 
+  const isSlotOccupied = (startTime: string, endTime: string) => {
+    return occupiedSlots.some(
+      (occupied) => occupied.startTime === startTime && occupied.endTime === endTime,
+    );
+  };
+
+  const getBaseBlockStatus = (baseBlock: TimeBlock) => {
+    if (divisions <= 1) {
+      return isSlotOccupied(baseBlock.startTime, baseBlock.endTime) ? "occupied" : "free";
+    }
+
+    const subs = getSubBlocks(baseBlock, divisions);
+    const occupiedCount = subs.filter((sub) => isSlotOccupied(sub.startTime, sub.endTime)).length;
+
+    if (occupiedCount === subs.length) {
+      return "occupied";
+    } else if (occupiedCount > 0) {
+      return "partial";
+    }
+    return "free";
+  };
+
   const [misReservas, setMisReservas] = useState<ReservaGuardada[]>([]);
+  const [loadingMisReservas, setLoadingMisReservas] = useState(false);
+  const [errorMisReservas, setErrorMisReservas] = useState("");
   const [reservasAdmin, setReservasAdmin] = useState<AdminReservation[]>([]);
   const [loadingReservasAdmin, setLoadingReservasAdmin] = useState(false);
   const [errorReservasAdmin, setErrorReservasAdmin] = useState("");
@@ -215,7 +311,9 @@ export default function Dashboard() {
     async function cargarDisponibilidad() {
       if (!selectedReserva || !fecha) {
         setOccupiedSlots([]);
+        setSelectedBaseBlock("");
         setSelectedTimeSlot("");
+        setDivisions(1);
         return;
       }
 
@@ -229,6 +327,8 @@ export default function Dashboard() {
 
         const slots = response.ocupiedSlots ?? response.occupiedSlots ?? [];
         setOccupiedSlots(normalizarBloquesOcupados(slots));
+        setDivisions(response.divisions ?? 1);
+        setSelectedBaseBlock("");
         setSelectedTimeSlot("");
       } catch (error) {
         console.error("Error cargando disponibilidad:", error);
@@ -252,44 +352,75 @@ export default function Dashboard() {
     );
   });
 
+  const cargarMisReservas = async () => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) return;
+
+    try {
+      setLoadingMisReservas(true);
+      setErrorMisReservas("");
+      const response = await apiRequest(`/reservations/user/${userId}`);
+      const mapped = response.map(mapBackendReservationToReservaGuardada);
+      setMisReservas(mapped);
+    } catch (error) {
+      console.error("Error al cargar reservas:", error);
+      setErrorMisReservas("No se pudieron cargar tus reservas.");
+    } finally {
+      setLoadingMisReservas(false);
+    }
+  };
+
+  useEffect(() => {
+    if (vista === "misReservas") {
+      cargarMisReservas();
+    }
+  }, [vista]);
+
+  useEffect(() => {
+    if (selectedReserva) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [selectedReserva]);
+
   const handleReservar = async () => {
     if (!selectedReserva || !selectedTimeSlot || !fecha) return;
 
-    const bloqueSeleccionado = BLOQUES_DISPONIBLES.find(
-      (bloque) => bloque.name === selectedTimeSlot,
-    );
+    let start = "";
+    let end = "";
 
-    if (!bloqueSeleccionado) return;
+    if (divisions > 1 && selectedTimeSlot.includes(" - Sub ")) {
+      const baseBlockName = selectedTimeSlot.split(" - ")[0];
+      const baseBlock = BLOQUES_DISPONIBLES.find((b) => b.name === baseBlockName);
+      if (!baseBlock) return;
+      const subs = getSubBlocks(baseBlock, divisions);
+      const subBlock = subs.find((s) => s.name === selectedTimeSlot);
+      if (!subBlock) return;
+      start = subBlock.startTime;
+      end = subBlock.endTime;
+    } else {
+      const baseBlock = BLOQUES_DISPONIBLES.find((b) => b.name === selectedTimeSlot);
+      if (!baseBlock) return;
+      start = baseBlock.startTime;
+      end = baseBlock.endTime;
+    }
 
     try {
-      const reservaCreada = await createReservation({
+      await createReservation({
         spaceId: String(selectedReserva.id),
         date: fecha,
-        startTime: bloqueSeleccionado.startTime,
-        endTime: bloqueSeleccionado.endTime,
+        startTime: start,
+        endTime: end,
       });
 
-      setMisReservas((prev: ReservaGuardada[]) => {
-        const yaExiste = prev.some(
-          (reserva) =>
-            reserva.id === selectedReserva.id &&
-            reserva.fechaReservada === fecha &&
-            reserva.horarioReservado === selectedTimeSlot,
-        );
-
-        if (yaExiste) return prev;
-
-        return [
-          ...prev,
-          {
-            ...selectedReserva,
-            fechaReservada: reservaCreada?.date ?? fecha,
-            horarioReservado: selectedTimeSlot,
-          },
-        ];
-      });
+      await cargarMisReservas();
 
       setSelectedReserva(null);
+      setSelectedBaseBlock("");
       setSelectedTimeSlot("");
       setOccupiedSlots([]);
     } catch (error) {
@@ -302,6 +433,7 @@ export default function Dashboard() {
 
   const openReservationDetail = (reserva: Reserva) => {
     setSelectedReserva(reserva);
+    setSelectedBaseBlock("");
     setSelectedTimeSlot("");
     setOccupiedSlots([]);
     setAvailabilityError("");
@@ -356,11 +488,18 @@ export default function Dashboard() {
   return (
     <div className="dashboard-page">
       <nav className="top-navbar">
-        <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}>
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+        <div className="navbar-left">
+          <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <button className="home-btn" onClick={() => setVista("salas")} title="Inicio">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </svg>
+          </button>
+        </div>
 
         <img src={logo} alt="Logo institución" className="navbar-logo" />
       </nav>
@@ -476,7 +615,17 @@ export default function Dashboard() {
                 </div>
               )}
 
+            {vista === "misReservas" && loadingMisReservas && (
+              <div className="empty-card">Cargando tus reservas...</div>
+            )}
+
+            {vista === "misReservas" && errorMisReservas && (
+              <div className="empty-card">{errorMisReservas}</div>
+            )}
+
             {vista === "misReservas" &&
+              !loadingMisReservas &&
+              !errorMisReservas &&
               misReservas.map((reserva) => (
                 <button
                   className="room-card"
@@ -498,11 +647,14 @@ export default function Dashboard() {
                 </button>
               ))}
 
-            {vista === "misReservas" && misReservas.length === 0 && (
-              <div className="empty-card">
-                No tienes reservas registradas.
-              </div>
-            )}
+            {vista === "misReservas" &&
+              !loadingMisReservas &&
+              !errorMisReservas &&
+              misReservas.length === 0 && (
+                <div className="empty-card">
+                  No tienes reservas registradas.
+                </div>
+              )}
 
             {vista === "adminReservas" && loadingReservasAdmin && (
               <div className="empty-card">Cargando reservas del día...</div>
@@ -583,6 +735,7 @@ export default function Dashboard() {
                   className="close-modal"
                   onClick={() => {
                     setSelectedReserva(null);
+                    setSelectedBaseBlock("");
                     setSelectedTimeSlot("");
                     setOccupiedSlots([]);
                   }}
@@ -654,6 +807,12 @@ export default function Dashboard() {
                       <section className="detail-card detail-card--wide">
                         <h3>Horarios disponibles</h3>
 
+                        {divisions > 1 && (
+                          <p style={{ fontStyle: "italic", color: "#666", marginBottom: "10px" }}>
+                            El horario solicitado no coincide con la división de bloques permitida ({divisions} división(es) para esta fecha). Selecciona un bloque base para ver sus subdivisiones.
+                          </p>
+                        )}
+
                         {!fecha && (
                           <p>Selecciona una fecha para consultar disponibilidad real.</p>
                         )}
@@ -664,23 +823,67 @@ export default function Dashboard() {
 
                         <div className="slots-grid">
                           {BLOQUES_DISPONIBLES.map((slot) => {
-                            const isOccupied = occupiedSlots.includes(slot.name);
+                            const status = getBaseBlockStatus(slot);
+                            const isOccupied = status === "occupied";
+                            const isSelected = selectedBaseBlock === slot.name || (divisions <= 1 && selectedTimeSlot === slot.name);
 
                             return (
                               <button
                                 key={slot.name}
                                 type="button"
-                                className={`slot-btn ${selectedTimeSlot === slot.name ? "selected" : ""}`}
-                                onClick={() => !isOccupied && setSelectedTimeSlot(slot.name)}
+                                className={`slot-btn ${isSelected ? "selected" : ""} ${status === "partial" ? "partial" : ""}`}
+                                onClick={() => {
+                                  if (!isOccupied) {
+                                    setSelectedBaseBlock(slot.name);
+                                    if (divisions <= 1) {
+                                      setSelectedTimeSlot(slot.name);
+                                    } else {
+                                      setSelectedTimeSlot(""); // Require selecting a subblock
+                                    }
+                                  }
+                                }}
                                 disabled={isOccupied || loadingAvailability}
                               >
                                 {isOccupied
                                   ? `${slot.name} ocupado`
-                                  : `${slot.name} (${slot.startTime} - ${slot.endTime})`}
+                                  : status === "partial"
+                                    ? `${slot.name} (parcial)`
+                                    : `${slot.name} (${slot.startTime} - ${slot.endTime})`}
                               </button>
                             );
                           })}
                         </div>
+
+                        {divisions > 1 && selectedBaseBlock && (
+                          <div className="sub-blocks-section" style={{ marginTop: "20px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
+                            <h4 style={{ marginBottom: "10px" }}>Subdivisiones para {selectedBaseBlock}:</h4>
+                            <div className="slots-grid">
+                              {(() => {
+                                const baseBlock = BLOQUES_DISPONIBLES.find(b => b.name === selectedBaseBlock);
+                                if (!baseBlock) return null;
+                                const subs = getSubBlocks(baseBlock, divisions);
+                                return subs.map((sub) => {
+                                  const isSubOccupied = isSlotOccupied(sub.startTime, sub.endTime);
+                                  const isSubSelected = selectedTimeSlot === sub.name;
+
+                                  return (
+                                    <button
+                                      key={sub.name}
+                                      type="button"
+                                      className={`slot-btn ${isSubSelected ? "selected" : ""}`}
+                                      onClick={() => !isSubOccupied && setSelectedTimeSlot(sub.name)}
+                                      disabled={isSubOccupied || loadingAvailability}
+                                    >
+                                      {isSubOccupied
+                                        ? `${sub.name.split(" - ")[1]} ocupado`
+                                        : `${sub.name.split(" - ")[1]} (${sub.startTime} - ${sub.endTime})`}
+                                    </button>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        )}
                       </section>
                     </div>
                   </div>

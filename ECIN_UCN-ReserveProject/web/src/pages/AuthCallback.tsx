@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getApiUrl } from "../config";
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -13,7 +14,7 @@ export default function AuthCallback() {
 
     (async () => {
       try {
-        const response = await fetch("http://localhost:3000/auth/exchange", {
+        const response = await fetch(`${getApiUrl()}/auth/exchange`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

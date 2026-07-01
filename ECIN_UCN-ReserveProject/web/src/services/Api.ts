@@ -1,4 +1,6 @@
-const API_URL = "http://localhost:3000";
+import { getApiUrl } from "../config";
+
+const API_URL = getApiUrl();
 
 export async function apiRequest(path: string, options: RequestInit = {}) {
   const token = sessionStorage.getItem("access_token");
@@ -31,4 +33,8 @@ export async function createReservation(data: {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function getReservationsByUser(userId: string) {
+  return apiRequest(`/reservations/user/${userId}`);
 }
