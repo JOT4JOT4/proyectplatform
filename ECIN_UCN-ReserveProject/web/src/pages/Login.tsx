@@ -2,20 +2,20 @@ import { getApiUrl } from "../config";
 import "../css/login.css";
 
 export default function Login() {
-    
+
     const handleLogin = () => {
         window.location.href = `${getApiUrl()}/auth/google/web`;
     };
 
     return (
-        <div className = "login-container">
+        <div className="login-container">
 
             <img src="../../assets/logo-ucn.png" className="logo-ucn" />
-            <div className = "login-box">
-                <h1 className = "login-title">Login</h1>
+            <div className="login-box">
+                <h1 className="login-title">Login</h1>
 
-                <div className = "divider">
-                    <span className = "divider-text">Iniciar sesión</span>
+                <div className="divider">
+                    <span className="divider-text">Iniciar sesión</span>
                 </div>
 
                 <button className="google-btn" onClick={handleLogin}>
@@ -23,9 +23,13 @@ export default function Login() {
                     Iniciar sesión con Google
                 </button>
 
+                <p className="login-warning">
+                    * Acceso exclusivo para correos institucionales de la UCN.*
+                </p>
+
                 <p className="forgot-password">Recuperar contraseña</p>
 
             </div>
-        </div>    
+        </div>
     )
 }
