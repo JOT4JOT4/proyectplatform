@@ -6,6 +6,7 @@ export default function AuthCallback() {
     const code = params.get("code");
 
     if (!code) {
+      console.error("No llegó code en la URL");
       window.location.href = "/";
       return;
     }
@@ -23,15 +24,20 @@ export default function AuthCallback() {
         const payload = await response.json();
 
         if (!response.ok || !payload?.access_token || !payload?.user) {
-          throw new Error(payload?.message ?? "No se pudo completar el inicio de sesión.");
+          throw new Error(
+            payload?.message ?? "No se pudo completar el inicio de sesión."
+          );
         }
 
         sessionStorage.setItem("access_token", payload.access_token);
+        localStorage.setItem("user_id", String(payload.user.id));
         localStorage.setItem("user_email", payload.user.email);
+        localStorage.setItem("user_role", payload.user.role);
+
         window.location.href = "/dashboard";
-      } catch {
-        window.location.href = "/";
-      }
+        } catch (error) {
+          console.error("Error en AuthCallback:", error);
+        }
     })();
   }, []);
 
