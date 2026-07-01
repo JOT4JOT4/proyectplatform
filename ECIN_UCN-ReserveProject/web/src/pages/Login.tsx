@@ -1,11 +1,9 @@
-import { getApiUrl } from "../config";
 import "../css/login.css";
 
 export default function Login() {
     
     const handleLogin = () => {
-        const apiUrl = getApiUrl();
-        window.location.href = `${apiUrl}/auth/google/web`;
+        window.location.href = "https://proyectplatform-production.up.railway.app/auth/google/web";
     };
 
     return (
