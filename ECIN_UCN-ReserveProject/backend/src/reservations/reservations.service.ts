@@ -216,6 +216,15 @@ export class ReservationsService {
     return reservations;
   }
 
+  async getDivisionsForDate(date: string): Promise<number> {
+    const config = await this.blockConfigRepository.createQueryBuilder('config')
+      .where('config.effectiveDate <= :date', { date })
+      .orderBy('config.effectiveDate', 'DESC')
+      .getOne();
+
+    return config ? config.divisions : 1;
+  }
+
   /**
    * OBTENER TODAS: Para paneles de administración
    */

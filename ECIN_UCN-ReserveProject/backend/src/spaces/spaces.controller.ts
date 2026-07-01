@@ -36,11 +36,13 @@ export class SpacesController {
       throw new BadRequestException('Debes proveer una fecha en la query (?date=YYYY-MM-DD)');
     }
     const ocupiedSlots = await this.reservationsService.getOccupiedSlots(spaceId, date);
+    const divisions = await this.reservationsService.getDivisionsForDate(date);
     return {
       spaceId,
       date,
       timezone: 'America/Santiago',
-      ocupiedSlots
+      ocupiedSlots,
+      divisions
     };
   }
 }
