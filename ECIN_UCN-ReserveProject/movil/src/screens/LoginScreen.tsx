@@ -24,7 +24,7 @@ export default function LoginScreen() {
 
       const isExpoGo = Constants.executionEnvironment === 'storeClient';
       const redirectUri = AuthSession.makeRedirectUri(
-        Platform.OS === 'web' || isExpoGo
+        Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web'
           ? { path: 'auth/callback' }
           : {
             scheme: 'reservasucn',
