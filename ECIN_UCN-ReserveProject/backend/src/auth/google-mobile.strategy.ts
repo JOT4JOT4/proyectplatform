@@ -10,7 +10,7 @@ export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mob
     super({
       clientID: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackURL: process.env.GOOGLE_MOBILE_CALLBACK_URL || `${backendUrl}/auth/google/mobile/callback`,
+      callbackURL: `${process.env.BACKEND_URL || 'https://proyectplatform-production.up.railway.app'}/auth/google/mobile/callback`,
       scope: ['email', 'profile'],
     });
   }
