@@ -95,7 +95,7 @@ export default function ReservasScreen() {
         await loadSpaces();
       } catch (requestError) {
         if (active) {
-          const message = requestError instanceof ApiError ? requestError.message : 'No se pudieron cargar los espacios desde el backend.';
+          const message = requestError instanceof ApiError ? requestError.message : 'No se pudieron cargar los espacios.';
           setError(message);
         }
       } finally {
