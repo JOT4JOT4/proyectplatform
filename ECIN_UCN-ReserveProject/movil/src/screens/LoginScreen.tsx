@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import Constants from 'expo-constants';
 import { useAuth } from '../contexts/AuthContext';
 import { apiPost, ApiError } from '../services/apiClient';
 import { GOOGLE_AUTH_URL } from '../config/environment';
@@ -22,12 +21,13 @@ export default function LoginScreen() {
       setError(null);
       setIsSigningIn(true);
 
+      // Usamos esquema propio en producción
       const redirectUri = AuthSession.makeRedirectUri({
-            scheme: 'reservasucn',
-            path: 'auth/callback',
-          },
-      );
+        scheme: 'reservasucn',
+        path: 'auth/callback',
+      });
 
+      // URL del backend en Railway (ejemplo)
       const authUrl = `${GOOGLE_AUTH_URL}?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       const authSessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
@@ -45,13 +45,20 @@ export default function LoginScreen() {
         return;
       }
 
+      // El backend devuelve JSON con { code } o { error }
       const callbackUrl = new URL(result.url);
       const code = callbackUrl.searchParams.get('code');
+      const errorMsg = callbackUrl.searchParams.get('error');
+
+      if (errorMsg) {
+        throw new Error(decodeURIComponent(errorMsg));
+      }
 
       if (!code) {
         throw new Error('No se recibió el código de autenticación.');
       }
 
+      // Intercambiamos el code por token en /auth/exchange
       const payload = await apiPost<AuthExchangeResponse>('/auth/exchange', { code });
 
       if (!payload?.access_token || !payload?.user) {
@@ -118,86 +125,28 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 0,
-    backgroundColor: '#ffffff',
-  },
-  topBrand: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 8,
-    backgroundColor: '#003057',
-  },
-  cardWrap: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: '#003057',
-    borderRadius: 24,
-    padding: 24,
-  },
-  logo: {
-    width: 170,
-    height: 70,
-    marginBottom: 10,
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  topBrand: { alignItems: 'center', paddingTop: 20, paddingBottom: 8, backgroundColor: '#003057' },
+  cardWrap: { flex: 1, justifyContent: 'center' },
+  card: { backgroundColor: '#003057', borderRadius: 24, padding: 24 },
+  logo: { width: 170, height: 70, marginBottom: 10 },
   kicker: {
-    color: '#DCEBFF',
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 10,
-    textAlign: 'center',
+    color: '#DCEBFF', fontSize: 13, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, textAlign: 'center',
   },
   title: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 10,
-    fontFamily: 'MyriadPro-regular',
-    textAlign: 'center',
+    color: '#ffffff', fontSize: 24, fontWeight: '800',
+    marginBottom: 10, fontFamily: 'MyriadPro-regular', textAlign: 'center',
   },
   subtitle: {
-    color: '#ffffff',
-    fontSize: 15,
-    lineHeight: 21,
-    marginBottom: 18,
-    textAlign: 'center',
+    color: '#ffffff', fontSize: 15, lineHeight: 21,
+    marginBottom: 18, textAlign: 'center',
   },
-  error: {
-    color: '#b42318',
-    marginBottom: 14,
-  },
-  button: {
-    backgroundColor: '#0059e9',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  googleLogo: {
-    width: 20,
-    height: 20,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 8,
-  },
-  footerText: {
-    color: '#6B778C',
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  error: { color: '#b42318', marginBottom: 14, textAlign: 'center' },
+  button: { backgroundColor: '#0059e9', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  googleLogo: { width: 20, height: 20 },
+  buttonText: { color: '#fff', fontWeight: '700' },
+  footer: { alignItems: 'center', paddingBottom: 8 },
+  footerText: { color: '#6B778C', fontSize: 12, textAlign: 'center' },
 });
