@@ -21,7 +21,7 @@ export default function LoginScreen() {
       setError(null);
       setIsSigningIn(true);
 
-      // Usamos esquema propio en producción
+      // Usamos el esquema registrado en app.json
       const redirectUri = AuthSession.makeRedirectUri({
         scheme: 'reservasucn',
         path: 'auth/callback',
@@ -38,14 +38,14 @@ export default function LoginScreen() {
       const result = await Promise.race([authSessionPromise, timeoutPromise]);
 
       if (result.type === 'timeout') {
-        throw new Error('La autenticación tardó demasiado. Revisa la URL del backend y vuelve a intentarlo.');
+        throw new Error('La autenticación tardó demasiado.');
       }
 
       if (result.type !== 'success' || !result.url) {
         return;
       }
 
-      // El backend devuelve JSON con { code } o { error }
+      // Capturamos el code desde la URL de redirección
       const callbackUrl = new URL(result.url);
       const code = callbackUrl.searchParams.get('code');
       const errorMsg = callbackUrl.searchParams.get('error');
