@@ -22,11 +22,7 @@ export default function LoginScreen() {
       setError(null);
       setIsSigningIn(true);
 
-      const isExpoGo = Constants.executionEnvironment === 'storeClient';
-      const redirectUri = AuthSession.makeRedirectUri(
-        Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web'
-          ? { path: 'auth/callback' }
-          : {
+      const redirectUri = AuthSession.makeRedirectUri({
             scheme: 'reservasucn',
             path: 'auth/callback',
           },
@@ -39,11 +35,7 @@ export default function LoginScreen() {
         timeoutId = setTimeout(() => resolve({ type: 'timeout' }), 90_000);
       });
 
-      const result = await Promise.race([authSessionPromise, timeoutPromise]);
-
-      if (result.type === 'timeout') {
-        throw new Error('La autenticación tardó demasiado. Revisa la URL del backend y vuelve a intentarlo.');
-      }
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
       if (result.type !== 'success' || !result.url) {
         return;
