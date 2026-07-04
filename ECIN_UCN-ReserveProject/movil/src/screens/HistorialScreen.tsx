@@ -1,14 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { apiGet, ApiError } from '../services/apiClient';
+import { apiGet, apiPatch, ApiError } from '../services/apiClient';
 import type { ReservationRecord } from '../services/apiTypes';
 
 export default function HistorialScreen() {
   const { token, user } = useAuth();
   const [items, setItems] = React.useState<ReservationRecord[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [actionLoadingId, setActionLoadingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  const loadHistory = React.useCallback(async () => {
+    if (!token || !user?.id) {
+      return [] as ReservationRecord[];
+    }
+
+    const data = await apiGet<ReservationRecord[]>(`/reservations/user/${user.id}`, token);
+    return Array.isArray(data) ? data : [];
+  }, [token, user?.id]);
 
   React.useEffect(() => {
     if (!token || !user?.id) {
@@ -22,10 +32,10 @@ export default function HistorialScreen() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await apiGet<ReservationRecord[]>(`/reservations/user/${user.id}`, token);
+        const data = await loadHistory();
 
         if (active) {
-          setItems(Array.isArray(data) ? data : []);
+          setItems(data);
         }
       } catch (requestError) {
         if (active) {
@@ -42,7 +52,48 @@ export default function HistorialScreen() {
     return () => {
       active = false;
     };
-  }, [token, user?.id]);
+  }, [loadHistory, token, user?.id]);
+
+  const refreshHistory = React.useCallback(async () => {
+    const data = await loadHistory();
+    setItems(data);
+  }, [loadHistory]);
+
+  const handleReservationAction = React.useCallback(
+    async (reservationId: string, action: 'confirm' | 'cancel') => {
+      if (!token) {
+        return;
+      }
+
+      const actionLabel = action === 'confirm' ? 'confirmar' : 'cancelar';
+
+      Alert.alert(
+        `¿${actionLabel.charAt(0).toUpperCase()}${actionLabel.slice(1)} reserva?`,
+        'La acción se enviará al backend y solo afectará tu propia reserva.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Continuar',
+            style: action === 'cancel' ? 'destructive' : 'default',
+            onPress: async () => {
+              try {
+                setActionLoadingId(reservationId);
+                setError(null);
+                await apiPatch(`/reservations/${reservationId}/${action}`, {}, token);
+                await refreshHistory();
+              } catch (requestError) {
+                const message = requestError instanceof ApiError ? requestError.message : `No se pudo ${actionLabel} la reserva.`;
+                setError(message);
+              } finally {
+                setActionLoadingId(null);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [refreshHistory, token],
+  );
 
   return (
     <View style={styles.container}>
@@ -50,7 +101,7 @@ export default function HistorialScreen() {
       <View style={styles.glowBottom} />
 
       <Text style={styles.header}>Historial de reservas</Text>
-      <Text style={styles.subheader}>Tus reservas reales consultadas desde el backend.</Text>
+      <Text style={styles.subheader}>Tus reservas historicas</Text>
 
       {isLoading ? <Text style={styles.note}>Cargando historial...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}
@@ -64,6 +115,28 @@ export default function HistorialScreen() {
             <Text style={styles.rowTitle}>{item.space?.name ?? 'Espacio reservado'}</Text>
             <Text style={styles.rowMeta}>{item.date} • {item.startTime} - {item.endTime}</Text>
             <Text style={styles.rowStatus}>{item.status}</Text>
+
+            {(item.status === 'pending' || item.status === 'active') ? (
+              <View style={styles.actionsRow}>
+                {item.status === 'pending' ? (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.confirmButton]}
+                    disabled={actionLoadingId === item.id}
+                    onPress={() => handleReservationAction(item.id, 'confirm')}
+                  >
+                    <Text style={styles.actionButtonText}>Confirmar</Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  disabled={actionLoadingId === item.id}
+                  onPress={() => handleReservationAction(item.id, 'cancel')}
+                >
+                  <Text style={styles.actionButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         )}
       />
@@ -132,5 +205,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 6,
     fontWeight: '700',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  confirmButton: {
+    backgroundColor: '#0059e9',
+  },
+  cancelButton: {
+    backgroundColor: '#a61b1b',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '800',
   },
 });

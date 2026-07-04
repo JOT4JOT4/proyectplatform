@@ -5,6 +5,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 @Injectable()
 export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mobile') {
   constructor() {
+    const backendUrl = process.env.PUBLIC_BACKEND_URL || 'http://localhost:3000';
+
     super({
       clientID: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
@@ -20,7 +22,11 @@ export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mob
     done: VerifyCallback,
   ): Promise<any> {
     const { name, emails, photos } = profile;
-    const email = emails[0].value;
+    const email = emails?.[0]?.value;
+
+    if (!email) {
+      return done(new UnauthorizedException('No se recibió correo de Google'), false);
+    }
 
     const allowedDomains = ['@alumnos.ucn.cl', '@ucn.cl', '@gmail.com'];
     const isAllowed = allowedDomains.some((domain) => email.endsWith(domain));
@@ -31,9 +37,9 @@ export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mob
 
     const user = {
       email,
-      firstName: name.givenName,
-      lastName: name.familyName,
-      picture: photos[0].value,
+      firstName: name?.givenName ?? '',
+      lastName: name?.familyName ?? '',
+      picture: photos?.[0]?.value ?? null,
       accessToken,
     };
 

@@ -8,6 +8,8 @@ export class GoogleWebStrategy extends PassportStrategy(
   'google-web',
 ) {
   constructor() {
+    const backendUrl = process.env.PUBLIC_BACKEND_URL || 'http://localhost:3000';
+
     super({
       clientID: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',

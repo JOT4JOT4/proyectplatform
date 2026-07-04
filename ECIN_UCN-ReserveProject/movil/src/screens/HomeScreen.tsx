@@ -1,9 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { apiGet, ApiError } from '../services/apiClient';
 import type { ReservationRecord, Space, SpacesResponse } from '../services/apiTypes';
+
+type MainTabParamList = {
+  Home: undefined;
+  Reservas: undefined;
+  Historial: undefined;
+};
 
 function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: Space[] }): Space[] {
   if (Array.isArray(response)) {
@@ -19,6 +27,7 @@ function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: S
 
 export function HomeScreen() {
   const { token, user } = useAuth();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -82,11 +91,11 @@ export function HomeScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.heroCard}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Dashboard real</Text>
+              <Text style={styles.badgeText}>Bienvenido</Text>
             </View>
             <Text style={styles.title}>Hola{user?.firstName ? `, ${user.firstName}` : ''}</Text>
             <Text style={styles.subtitle}>
-              Aquí ves espacios y reservas consultados directamente desde el backend, sin datos de prueba.
+              Aquí ves espacios y reservas disponibles.
             </Text>
 
             <View style={styles.metricRow}>
@@ -99,6 +108,10 @@ export function HomeScreen() {
                 <Text style={styles.metricValue}>{activeReservationsCount}</Text>
               </View>
             </View>
+
+            <Text style={styles.ctaButton} onPress={() => navigation.navigate('Reservas')}>
+              Reservar ahora
+            </Text>
           </View>
 
           {isLoading ? <ActivityIndicator color="#003057" /> : null}
@@ -233,6 +246,18 @@ const styles = StyleSheet.create({
     color: '#081026',
     fontSize: 28,
     fontWeight: '700',
+  },
+  ctaButton: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: '#ffffff',
+    color: '#003057',
+    fontSize: 14,
+    fontWeight: '800',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   errorText: {
     color: '#b42318',

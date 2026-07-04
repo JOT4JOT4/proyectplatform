@@ -8,6 +8,7 @@ import { GoogleStrategy } from './google.strategy';
 import { UsersModule } from '../users/users.module';
 import { GoogleWebStrategy } from './google-web.strategy';
 import { GoogleMobileStrategy } from './google-mobile.strategy';
+import { GoogleMobileGuard } from './guards/google-mobile.guard';
 
 @Module({
   imports: [
@@ -19,6 +20,6 @@ import { GoogleMobileStrategy } from './google-mobile.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, GoogleWebStrategy, GoogleMobileStrategy, JwtStrategy],
+  providers: [AuthService, GoogleStrategy, GoogleWebStrategy, GoogleMobileStrategy, GoogleMobileGuard, JwtStrategy],
 })
 export class AuthModule {}

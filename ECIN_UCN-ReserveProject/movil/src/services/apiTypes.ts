@@ -73,4 +73,5 @@ export type ReservationRecord = {
   status: 'pending' | 'active' | 'cancelled' | 'completed';
   createdAt?: string;
   space?: Space;
+  user?: BackendUser;
 };
