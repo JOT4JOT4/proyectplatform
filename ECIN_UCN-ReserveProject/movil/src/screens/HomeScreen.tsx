@@ -91,11 +91,11 @@ export function HomeScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.heroCard}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Dashboard real</Text>
+              <Text style={styles.badgeText}>Bienvenido</Text>
             </View>
             <Text style={styles.title}>Hola{user?.firstName ? `, ${user.firstName}` : ''}</Text>
             <Text style={styles.subtitle}>
-              Aquí ves espacios y reservas consultados directamente desde el backend, sin datos de prueba.
+              Aquí ves espacios y reservas disponibles.
             </Text>
 
             <View style={styles.metricRow}>

@@ -101,7 +101,7 @@ export default function HistorialScreen() {
       <View style={styles.glowBottom} />
 
       <Text style={styles.header}>Historial de reservas</Text>
-      <Text style={styles.subheader}>Tus reservas reales consultadas desde el backend.</Text>
+      <Text style={styles.subheader}>Tus reservas historicas</Text>
 
       {isLoading ? <Text style={styles.note}>Cargando historial...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}

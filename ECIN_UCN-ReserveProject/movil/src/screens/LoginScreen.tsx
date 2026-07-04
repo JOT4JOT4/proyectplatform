@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import Constants from 'expo-constants';
 import { useAuth } from '../contexts/AuthContext';
 import { apiPost, ApiError } from '../services/apiClient';
 import { GOOGLE_AUTH_URL } from '../config/environment';
@@ -15,16 +16,34 @@ export default function LoginScreen() {
   const [error, setError] = React.useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     try {
       setError(null);
       setIsSigningIn(true);
 
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: 'reservasucn',
-        path: 'auth/callback',
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      const redirectUri = AuthSession.makeRedirectUri(
+        Platform.OS === 'web' || isExpoGo
+          ? { path: 'auth/callback' }
+          : {
+            scheme: 'reservasucn',
+            path: 'auth/callback',
+          },
+      );
+
+      const authUrl = `${GOOGLE_AUTH_URL}?redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      const authSessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      const timeoutPromise = new Promise<{ type: 'timeout' }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ type: 'timeout' }), 90_000);
       });
 
-      const result = await WebBrowser.openAuthSessionAsync(GOOGLE_AUTH_URL, redirectUri);
+      const result = await Promise.race([authSessionPromise, timeoutPromise]);
+
+      if (result.type === 'timeout') {
+        throw new Error('La autenticación tardó demasiado. Revisa la URL del backend y vuelve a intentarlo.');
+      }
 
       if (result.type !== 'success' || !result.url) {
         return;
@@ -53,22 +72,50 @@ export default function LoginScreen() {
       setError(message);
       console.warn('Failed to complete Google login', signInError);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setIsSigningIn(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.kicker}>Reserva de espacios UCN</Text>
-        <Text style={styles.title}>Acceso seguro</Text>
-        <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios</Text>
+      <View style={styles.topBrand}>
+        <Image
+          source={require('../../assets/ucn-isologo-2018.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Reserva de espacios</Text>
+      </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.cardWrap}>
+        <View style={styles.card}>
+          <Text style={styles.kicker}>Acceso seguro</Text>
+          <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios</Text>
 
-        <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
-          {isSigningIn ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continuar con Google</Text>}
-        </TouchableOpacity>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
+            {isSigningIn ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={styles.buttonContent}>
+                <Image
+                  source={require('../../assets/250px-Google__G__logo.svg.webp')}
+                  style={styles.googleLogo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.buttonText}>Continuar con Google</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>© 2026 UCN. Todos los derechos reservados.</Text>
       </View>
     </View>
   );
@@ -77,34 +124,52 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
+    padding: 0,
+    backgroundColor: '#ffffff',
+  },
+  topBrand: {
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 8,
     backgroundColor: '#003057',
   },
+  cardWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#003057',
     borderRadius: 24,
     padding: 24,
   },
+  logo: {
+    width: 170,
+    height: 70,
+    marginBottom: 10,
+  },
   kicker: {
-    color: '#0059e9',
-    fontSize: 12,
+    color: '#DCEBFF',
+    fontSize: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   title: {
-    color: '#081026',
-    fontSize: 28,
+    color: '#ffffff',
+    fontSize: 24,
     fontWeight: '800',
     marginBottom: 10,
+    fontFamily: 'MyriadPro-regular',
+    textAlign: 'center',
   },
   subtitle: {
-    color: '#3D4B63',
+    color: '#ffffff',
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 18,
+    textAlign: 'center',
   },
   error: {
     color: '#b42318',
@@ -116,8 +181,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
+  },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  footer: {
+    alignItems: 'center',
+    paddingBottom: 8,
+  },
+  footerText: {
+    color: '#6B778C',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

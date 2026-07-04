@@ -2,7 +2,19 @@ import React from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, Alert, StyleSheet } from 'react-native';
 import { apiGet, apiPost, apiPatch, ApiError } from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import type { Space } from '../services/apiTypes';
+import type { Space, SpacesResponse } from '../services/apiTypes';
+
+function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: Space[] }): Space[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if ('data' in response && Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  return [];
+}
 
 export default function SpacesAdmin() {
   const { token } = useAuth();
@@ -13,8 +25,8 @@ export default function SpacesAdmin() {
   const loadSpaces = async () => {
     if (!token) return;
     try {
-      const response = await apiGet<Space[]>('/spaces', token);
-      setSpaces(response.filter(s => s.isActive !== false));
+      const response = await apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token);
+      setSpaces(normalizeSpacesResponse(response).filter((space) => space.isActive !== false));
     } catch (err) {
       console.warn('Error cargando espacios', err);
     }
@@ -22,7 +34,7 @@ export default function SpacesAdmin() {
 
   React.useEffect(() => {
     loadSpaces();
-  }, []);
+  }, [token]);
 
   // Crear espacio
   const handleCreateSpace = async () => {

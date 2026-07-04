@@ -2,7 +2,6 @@ import React from 'react';
 import {  View,  Text,  StyleSheet,  FlatList,  TouchableOpacity,  Modal, Pressable,  ScrollView,  Alert,  Image,
 } from 'react-native';
 import dayjs from 'dayjs';
-import DateTimePicker from 'react-native-ui-datepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { apiGet, apiPost, ApiError } from '../services/apiClient';
 import type { OccupiedSlot, ReservationRecord, Space, SpaceAvailability, SpacesResponse } from '../services/apiTypes';
@@ -53,6 +52,17 @@ function getSlotLabel(slot: TimeSlot | null) {
   return slot?.label ?? 'Sin bloque seleccionado';
 }
 
+function buildDateOptions(daysAhead = 14) {
+  return Array.from({ length: daysAhead }, (_, index) => {
+    const date = dayjs().add(index, 'day');
+    return {
+      value: date,
+      label: date.format('dddd, DD/MM/YYYY'),
+      shortLabel: date.format('DD/MM'),
+    };
+  });
+}
+
 export default function ReservasScreen() {
   const { token } = useAuth();
   const [spaces, setSpaces] = React.useState<Space[]>([]);
@@ -66,6 +76,7 @@ export default function ReservasScreen() {
   const [showDateModal, setShowDateModal] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const dateOptions = React.useMemo(() => buildDateOptions(14), []);
 
   const loadSpaces = React.useCallback(async () => {
     const response = await apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token);
@@ -190,7 +201,7 @@ export default function ReservasScreen() {
       <View style={styles.glowBottom} />
 
       <Text style={styles.header}>Espacios disponibles</Text>
-      <Text style={styles.subheader}>Consulta espacios reales del backend y reserva un bloque disponible.</Text>
+      <Text style={styles.subheader}>Consulta espacios y reserva un bloque disponible.</Text>
 
       <View style={styles.filtersRow}>
         <TouchableOpacity style={styles.filterChip} onPress={() => setShowDateModal(true)}>
@@ -204,7 +215,7 @@ export default function ReservasScreen() {
         </TouchableOpacity>
       </View>
 
-      {isLoading ? <Text style={styles.note}>Cargando información desde el backend...</Text> : null}
+      {isLoading ? <Text style={styles.note}>Cargando información...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}
 
       <FlatList
@@ -226,15 +237,22 @@ export default function ReservasScreen() {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Selecciona fecha</Text>
-            <DateTimePicker
-              mode="single"
-              date={selectedDate.toDate()}
-              onChange={(params) => {
-                if (params?.date) {
-                  setSelectedDate(dayjs(params.date));
-                }
-              }}
-            />
+            <ScrollView style={styles.dateList} showsVerticalScrollIndicator={false}>
+              {dateOptions.map((option) => {
+                const selected = option.value.format('YYYY-MM-DD') === selectedDate.format('YYYY-MM-DD');
+
+                return (
+                  <TouchableOpacity
+                    key={option.value.format('YYYY-MM-DD')}
+                    style={[styles.dateOption, selected && styles.dateOptionSelected]}
+                    onPress={() => setSelectedDate(option.value)}
+                  >
+                    <Text style={[styles.dateOptionLabel, selected && styles.dateOptionLabelSelected]}>{option.label}</Text>
+                    <Text style={[styles.dateOptionMeta, selected && styles.dateOptionMetaSelected]}>{option.shortLabel}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
             <Pressable style={styles.primaryButton} onPress={() => setShowDateModal(false)}>
               <Text style={styles.primaryButtonText}>Usar fecha</Text>
             </Pressable>
@@ -433,6 +451,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 18,
+  },
+  dateList: {
+    maxHeight: 320,
+    marginBottom: 14,
+  },
+  dateOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#F5F8FC',
+    marginBottom: 10,
+  },
+  dateOptionSelected: {
+    backgroundColor: '#003057',
+  },
+  dateOptionLabel: {
+    color: '#081026',
+    fontWeight: '800',
+  },
+  dateOptionLabelSelected: {
+    color: '#fff',
+  },
+  dateOptionMeta: {
+    color: '#3D4B63',
+    marginTop: 4,
+    fontSize: 12,
+  },
+  dateOptionMetaSelected: {
+    color: '#CFE4FF',
   },
   modalCardLarge: {
     backgroundColor: '#fff',

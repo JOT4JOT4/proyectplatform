@@ -8,10 +8,12 @@ export class GoogleWebStrategy extends PassportStrategy(
   'google-web',
 ) {
   constructor() {
+    const backendUrl = process.env.PUBLIC_BACKEND_URL || 'http://localhost:3000';
+
     super({
       clientID: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackURL: 'http://localhost:3000/auth/google/web/callback',
+      callbackURL: process.env.GOOGLE_WEB_CALLBACK_URL || `${backendUrl}/auth/google/web/callback`,
       scope: ['email', 'profile'],
     });
   }

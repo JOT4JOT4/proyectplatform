@@ -2,7 +2,19 @@ import React from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Modal, StyleSheet } from 'react-native';
 import { apiGet, apiPost, apiPatch, ApiError } from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import type { ReservationRecord, Space, BackendUser } from '../services/apiTypes';
+import type { ReservationRecord, Space, SpacesResponse, BackendUser } from '../services/apiTypes';
+
+function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: Space[] }): Space[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if ('data' in response && Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  return [];
+}
 
 export default function ReservationsAdmin() {
   const { token } = useAuth();
@@ -20,11 +32,11 @@ export default function ReservationsAdmin() {
     try {
       const [reservationsResponse, spacesResponse, usersResponse] = await Promise.all([
         apiGet<ReservationRecord[]>('/reservations', token),
-        apiGet<Space[]>('/spaces', token),
+        apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token),
         apiGet<BackendUser[]>('/users', token),
       ]);
       setReservations(reservationsResponse);
-      setSpaces(spacesResponse);
+      setSpaces(normalizeSpacesResponse(spacesResponse).filter((space) => space.isActive !== false));
       setUsers(usersResponse);
     } catch (err) {
       console.warn('Error cargando datos', err);
@@ -37,7 +49,7 @@ export default function ReservationsAdmin() {
     // Ejemplo de tiempo real con polling (puedes reemplazar con WebSocket)
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [token]);
 
   // Cancelar reserva con motivo
   const handleCancelReservation = async () => {

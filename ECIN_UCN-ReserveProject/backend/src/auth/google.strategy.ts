@@ -20,7 +20,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     done: VerifyCallback,
   ): Promise<any> {
     const { name, emails, photos } = profile;
-    const email = emails[0].value;
+    const email = emails?.[0]?.value;
+
+    if (!email) {
+      return done(new UnauthorizedException('No se recibió correo de Google'), false);
+    }
 
     
     const allowedDomain = '@alumnos.ucn.cl'; 
@@ -31,9 +35,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
     const user = {
       email,
-      firstName: name.givenName,
-      lastName: name.familyName,
-      picture: photos[0].value,
+      firstName: name?.givenName ?? '',
+      lastName: name?.familyName ?? '',
+      picture: photos?.[0]?.value ?? null,
       accessToken,
     };
 
