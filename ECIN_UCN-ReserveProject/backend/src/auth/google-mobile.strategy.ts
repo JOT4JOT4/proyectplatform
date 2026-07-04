@@ -28,9 +28,10 @@ export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mob
       return done(new UnauthorizedException('No se recibió correo de Google'), false);
     }
 
-    const allowedDomain = '@alumnos.ucn.cl';
+    const allowedDomains = ['@alumnos.ucn.cl', '@ucn.cl'];
+    const isAllowed = allowedDomains.some((domain) => email.endsWith(domain));
 
-    if (!email.endsWith(allowedDomain)) {
+    if (!isAllowed) {
       return done(new UnauthorizedException('Solo se permiten correos institucionales de la UCN'), false);
     }
 
