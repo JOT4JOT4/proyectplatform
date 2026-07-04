@@ -4,24 +4,11 @@ import { AuthService } from './auth.service';
 import type { Response } from 'express';
 import { GoogleMobileGuard } from './guards/google-mobile.guard';
 
-function resolveMobileCallbackUrl(state: unknown) {
-  const fallback = process.env.MOBILE_AUTH_CALLBACK_URL || 'reservasucn://auth/google/mobile/callback';
-
-  if (typeof state !== 'string' || state.trim().length === 0) {
-    return fallback;
-  }
-
-  const decoded = decodeURIComponent(state);
-  const isAllowedCustomScheme = /^(reservasucn|exp|exps):\/\//i.test(decoded);
-  const isAllowedLocalHttp = /^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?(\/|$)/i.test(decoded);
-
-  return isAllowedCustomScheme || isAllowedLocalHttp ? decoded : fallback;
-}
-
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // --- Flujo Google Web (sin cambios) ---
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth(@Req() req) {}
@@ -43,11 +30,10 @@ export class AuthController {
     const code = this.authService.createLoginCode(loginData);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    return res.redirect(
-      `${frontendUrl}/auth/callback?code=${code}`,
-    );
+    return res.redirect(`${frontendUrl}/auth/callback?code=${code}`);
   }
 
+  // --- Flujo Google Mobile (ajustado) ---
   @Get('google/mobile')
   @UseGuards(GoogleMobileGuard)
   async googleMobileAuth(@Req() req) {}
@@ -58,17 +44,12 @@ export class AuthController {
     try {
       const loginData = await this.authService.googleLogin(req);
       const code = this.authService.createLoginCode(loginData);
-      const callbackUrl = resolveMobileCallbackUrl(req.query?.state);
 
-      const separator = callbackUrl.includes('?') ? '&' : '?';
-
-      return res.redirect(`${callbackUrl}${separator}code=${code}`);
+      // En vez de redirigir a reservasucn://, devolvemos JSON
+      return res.json({ code });
     } catch (error) {
-      const callbackUrl = resolveMobileCallbackUrl(req.query?.state);
-      const separator = callbackUrl.includes('?') ? '&' : '?';
       const message = error instanceof Error ? error.message : 'No se pudo completar el inicio de sesión.';
-
-      return res.redirect(`${callbackUrl}${separator}error=${encodeURIComponent(message)}`);
+      return res.json({ error: message });
     }
   }
 
@@ -80,8 +61,7 @@ export class AuthController {
   @Get('logout')
   logout() {
     return {
-      message:
-        'Sesión cerrada. El frontend debe eliminar el token JWT localmente.',
+      message: 'Sesión cerrada. El frontend debe eliminar el token JWT localmente.',
     };
   }
 }
