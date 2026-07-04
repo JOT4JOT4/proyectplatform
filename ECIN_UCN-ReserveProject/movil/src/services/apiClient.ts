@@ -64,3 +64,12 @@ export async function apiPost<T>(path: string, body: unknown, token?: string | n
     body: JSON.stringify(body),
   });
 }
+
+export async function apiPatch<T>(path: string, body: unknown = {}, token?: string | null): Promise<T> {
+  return apiRequest<T>(path, {
+    method: 'PATCH',
+    token,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
