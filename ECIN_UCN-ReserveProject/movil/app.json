@@ -4,6 +4,11 @@
     "slug": "movil",
     "version": "1.0.0",
     "scheme": "reservasucn",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
