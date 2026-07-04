@@ -5,7 +5,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 @Injectable()
 export class GoogleMobileStrategy extends PassportStrategy(Strategy, 'google-mobile') {
   constructor() {
-    const backendUrl = process.env.PUBLIC_BACKEND_URL || 'http://localhost:3000';
+    const backendUrl = process.env.PUBLIC_BACKEND_URL || 'reservasucn://auth/google/mobile/callback';
 
     super({
       clientID: process.env.GOOGLE_CLIENT_ID || '',
