@@ -35,7 +35,11 @@ export default function LoginScreen() {
         timeoutId = setTimeout(() => resolve({ type: 'timeout' }), 90_000);
       });
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      const result = await Promise.race([authSessionPromise, timeoutPromise]);
+
+      if (result.type === 'timeout') {
+        throw new Error('La autenticación tardó demasiado. Revisa la URL del backend y vuelve a intentarlo.');
+      }
 
       if (result.type !== 'success' || !result.url) {
         return;

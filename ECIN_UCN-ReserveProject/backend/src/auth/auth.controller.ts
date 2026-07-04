@@ -5,7 +5,7 @@ import type { Response } from 'express';
 import { GoogleMobileGuard } from './guards/google-mobile.guard';
 
 function resolveMobileCallbackUrl(state: unknown) {
-  const fallback = process.env.MOBILE_AUTH_CALLBACK_URL || 'reservasucn://auth/callback';
+  const fallback = process.env.MOBILE_AUTH_CALLBACK_URL || 'reservasucn://auth/google/mobile/callback';
 
   if (typeof state !== 'string' || state.trim().length === 0) {
     return fallback;
