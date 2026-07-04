@@ -25,8 +25,9 @@ export class MailService {
 
   async sendMail(to: string, subject: string, html: string): Promise<boolean> {
     try {
+      const from = this.configService.get<string>('MAIL_FROM') || '"Sistema de Reservas UCN" <noreply@ucn.cl>';
       const info = await this.transporter.sendMail({
-        from: '"Sistema de Reservas UCN" <noreply@ucn.cl>',
+        from,
         to,
         subject,
         html,
