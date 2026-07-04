@@ -41,7 +41,7 @@ export class AuthController {
   async googleWebAuthRedirect(@Req() req, @Res() res: Response) {
     const loginData = await this.authService.googleLogin(req);
     const code = this.authService.createLoginCode(loginData);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://reservasucn.vercel.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://reservasucn-production.up.railway.app';
 
     return res.redirect(
       `${frontendUrl}/auth/callback?code=${code}`,
