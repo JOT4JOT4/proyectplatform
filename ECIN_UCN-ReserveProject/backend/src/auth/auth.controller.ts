@@ -45,8 +45,7 @@ export class AuthController {
       const loginData = await this.authService.googleLogin(req);
       const code = this.authService.createLoginCode(loginData);
 
-      // En vez de redirigir a reservasucn://, devolvemos JSON
-      return res.json({ code });
+      return res.redirect(`reservasucn://auth/callback?code=${code}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo completar el inicio de sesión.';
       return res.json({ error: message });
