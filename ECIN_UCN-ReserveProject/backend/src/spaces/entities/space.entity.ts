@@ -34,7 +34,7 @@ export class Space {
 
   @ManyToOne(() => Space, (space) => space.subspaces, { nullable: true })
   @JoinColumn({ name: 'parentId' })
-  parent: Space;
+  parent: Space | null;
 
   @OneToMany(() => Space, (space) => space.parent)
   subspaces: Space[];

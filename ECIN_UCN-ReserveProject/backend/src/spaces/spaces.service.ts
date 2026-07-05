@@ -1,18 +1,21 @@
-import { Injectable ,ConflictException} from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { CreateSpaceDto } from './dto/create-space.dto';
 import { UpdateSpaceDto } from './dto/update-space.dto';
 import { Space, SpaceType } from './entities/space.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
+import { Reservation } from '../reservations/entities/reservation.entity';
 
 @Injectable()
 export class SpacesService {
   constructor(
     @InjectRepository(Space)
-    private spaceRepository: Repository<Space>,
+    private readonly spaceRepository: Repository<Space>,
+    @InjectRepository(Reservation)
+    private readonly reservationRepository: Repository<Reservation>,
   ) {}
 
-async create(createSpaceDto: any) {
+  async create(createSpaceDto: CreateSpaceDto) {
     const existingSpace = await this.spaceRepository.findOne({
       where: {
         name: createSpaceDto.name,
@@ -21,31 +24,39 @@ async create(createSpaceDto: any) {
     });
 
     if (existingSpace) {
-      throw new ConflictException(
-        `Ya existe un espacio llamado '${createSpaceDto.name}' en la zona '${createSpaceDto.zone}'.`
-      );
+      throw new ConflictException(`Ya existe un espacio llamado '${createSpaceDto.name}' en la zona '${createSpaceDto.zone}'.`);
     }
-    
-    const newSpace = this.spaceRepository.create(createSpaceDto);
+
+    const parent = createSpaceDto.parentId
+      ? await this.spaceRepository.findOne({ where: { id: createSpaceDto.parentId } })
+      : null;
+
+    const newSpace = this.spaceRepository.create({
+      ...createSpaceDto,
+      parent: parent ?? undefined,
+    });
+
     return await this.spaceRepository.save(newSpace);
   }
 
-async findAll(page: number, limit: number, zone?: string, type?: SpaceType) {
+  async findAll(page: number, limit: number, zone?: string, type?: SpaceType, includeInactive = false) {
     const skip = (page - 1) * limit;
-    const whereCondition: any = { isActive: true }; 
+    const whereCondition: any = includeInactive ? {} : { isActive: true };
 
     if (zone) {
       whereCondition.zone = zone;
     }
+
     if (type) {
       whereCondition.type = type;
     }
 
     const [data, total] = await this.spaceRepository.findAndCount({
       where: whereCondition,
-      skip: skip,
+      skip,
       take: limit,
-      order: { name: 'ASC' }, 
+      order: { name: 'ASC' },
+      relations: ['parent', 'subspaces'],
     });
 
     return {
@@ -58,15 +69,67 @@ async findAll(page: number, limit: number, zone?: string, type?: SpaceType) {
     };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} space`;
+  async findOne(id: string) {
+    const space = await this.spaceRepository.findOne({ where: { id }, relations: ['parent', 'subspaces'] });
+    if (!space) {
+      throw new NotFoundException('El espacio no existe.');
+    }
+
+    return space;
   }
 
-  update(id: number, updateSpaceDto: UpdateSpaceDto) {
-    return `This action updates a #${id} space`;
+  async update(id: string, updateSpaceDto: UpdateSpaceDto) {
+    const space = await this.spaceRepository.findOne({ where: { id }, relations: ['parent', 'subspaces'] });
+    if (!space) {
+      throw new NotFoundException('El espacio no existe.');
+    }
+
+    const nextName = updateSpaceDto.name ?? space.name;
+    const nextZone = updateSpaceDto.zone ?? space.zone;
+
+    const existingSpace = await this.spaceRepository.findOne({
+      where: {
+        id: Not(id),
+        name: nextName,
+        zone: nextZone,
+      },
+    });
+
+    if (existingSpace) {
+      throw new ConflictException(`Ya existe un espacio llamado '${nextName}' en la zona '${nextZone}'.`);
+    }
+
+    if (updateSpaceDto.parentId !== undefined) {
+      space.parent = updateSpaceDto.parentId
+        ? (await this.spaceRepository.findOne({ where: { id: updateSpaceDto.parentId } })) ?? null
+        : null;
+    }
+
+    space.name = nextName;
+    space.zone = nextZone;
+    space.type = updateSpaceDto.type ?? space.type;
+    space.description = updateSpaceDto.description ?? space.description;
+    space.imageUrl = updateSpaceDto.imageUrl ?? space.imageUrl;
+    space.capacity = updateSpaceDto.capacity ?? space.capacity;
+    space.isActive = updateSpaceDto.isActive ?? space.isActive;
+
+    return await this.spaceRepository.save(space);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} space`;
+  async remove(id: string) {
+    const space = await this.spaceRepository.findOne({ where: { id }, relations: ['subspaces'] });
+    if (!space) {
+      throw new NotFoundException('El espacio no existe.');
+    }
+
+    const reservationCount = await this.reservationRepository.count({ where: { space: { id } } });
+    const hasSubspaces = (space.subspaces?.length ?? 0) > 0;
+
+    if (reservationCount > 0 || hasSubspaces) {
+      space.isActive = false;
+      return await this.spaceRepository.save(space);
+    }
+
+    return await this.spaceRepository.remove(space);
   }
 }

@@ -40,11 +40,11 @@ export class ReservationsController {
   
   @Patch(':id/cancel')
   @UseGuards(AuthGuard('jwt'))
-  cancel(@Param('id') id: string, @Req() req) {
+  cancel(@Param('id') id: string, @Body() body: { reason?: string }, @Req() req) {
     return this.reservationsService.cancel(id, {
       role: req.user.role,
       userId: req.user.userId,
-    });
+    }, body?.reason);
   }
 
   @Get('user/:userId')

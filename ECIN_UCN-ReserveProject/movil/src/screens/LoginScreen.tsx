@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import Constants from 'expo-constants';
 import { useAuth } from '../contexts/AuthContext';
 import { apiPost, ApiError } from '../services/apiClient';
 import { GOOGLE_AUTH_URL } from '../config/environment';
@@ -22,17 +21,13 @@ export default function LoginScreen() {
       setError(null);
       setIsSigningIn(true);
 
-      // Detectamos si estamos en Expo Go
-      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      // Usamos el esquema registrado en app.json
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'reservasucn',
+        path: 'auth/callback',
+      });
 
-      // En Expo Go usamos proxy, en producción usamos esquema
-      const redirectUri = isExpoGo
-        ? AuthSession.makeRedirectUri({ useProxy: true })
-        : AuthSession.makeRedirectUri({
-            scheme: 'reservasucn',
-            path: 'auth/callback',
-          });
-
+      // URL del backend en Railway (ejemplo)
       const authUrl = `${GOOGLE_AUTH_URL}?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       const authSessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
@@ -43,14 +38,14 @@ export default function LoginScreen() {
       const result = await Promise.race([authSessionPromise, timeoutPromise]);
 
       if (result.type === 'timeout') {
-        throw new Error('La autenticación tardó demasiado. Revisa la URL del backend y vuelve a intentarlo.');
+        throw new Error('La autenticación tardó demasiado.');
       }
 
       if (result.type !== 'success' || !result.url) {
         return;
       }
 
-      // Capturamos el code desde la URL
+      // Capturamos el code desde la URL de redirección
       const callbackUrl = new URL(result.url);
       const code = callbackUrl.searchParams.get('code');
       const errorMsg = callbackUrl.searchParams.get('error');

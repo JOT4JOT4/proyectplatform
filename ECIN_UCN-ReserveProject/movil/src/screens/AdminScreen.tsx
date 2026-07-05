@@ -2,9 +2,11 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import SpacesAdmin from './SpacesAdmin';
 import ReservationsAdmin from './ReservationsAdmin';
+import ReservasScreen from './ReservasScreen';
+import ConfigScreen from './ConfigScreen';
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = React.useState<'spaces' | 'reservations'>('spaces');
+  const [activeTab, setActiveTab] = React.useState<'spaces' | 'reservations' | 'reservas' | 'config'>('spaces');
 
   return (
     <View style={styles.container}>
@@ -16,17 +18,35 @@ export default function AdminScreen() {
         >
           <Text style={[styles.tabText, activeTab === 'spaces' && styles.activeTabText]}>Espacios</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'reservations' && styles.activeTab]}
           onPress={() => setActiveTab('reservations')}
         >
           <Text style={[styles.tabText, activeTab === 'reservations' && styles.activeTabText]}>Reservas</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'reservas' && styles.activeTab]}
+          onPress={() => setActiveTab('reservas')}
+        >
+          <Text style={[styles.tabText, activeTab === 'reservas' && styles.activeTabText]}>Reservar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'config' && styles.activeTab]}
+          onPress={() => setActiveTab('config')}
+        >
+          <Text style={[styles.tabText, activeTab === 'config' && styles.activeTabText]}>Configuración</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Contenido dinámico */}
       <View style={styles.content}>
-        {activeTab === 'spaces' ? <SpacesAdmin /> : <ReservationsAdmin />}
+        {activeTab === 'spaces' && <SpacesAdmin />}
+        {activeTab === 'reservations' && <ReservationsAdmin />}
+        {activeTab === 'reservas' && <ReservasScreen />}
+        {activeTab === 'config' && <ConfigScreen />}
       </View>
     </View>
   );

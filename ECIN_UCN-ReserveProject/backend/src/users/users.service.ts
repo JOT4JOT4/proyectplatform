@@ -30,6 +30,27 @@ export class UsersService {
     return user;
   }
 
+  async findAll(): Promise<User[]> {
+    return await this.usersRepository.find({
+      order: { firstName: 'ASC', lastName: 'ASC' },
+    });
+  }
+
+  async updateWeeklyLimit(userId: string, maxWeeklyReservations: number | null): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    user.maxWeeklyReservations = maxWeeklyReservations;
+    return await this.usersRepository.save(user);
+  }
+
+  async getWeeklyReservationLimit(userId: string, defaultValue: number): Promise<number> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    return user?.maxWeeklyReservations ?? defaultValue;
+  }
+
   async createPenalty(userId: string, penaltyData: { startDate: string; endDate: string; reason: string }): Promise<UserPenalty> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {

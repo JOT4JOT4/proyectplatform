@@ -45,6 +45,20 @@ export class ReservationsService {
       throw new BadRequestException('El usuario tiene una penalización activa en esta fecha y no puede realizar reservas.');
     }
 
+    if (userRole !== 'admin') {
+      const maxAdvanceDaysStr = await this.getSetting('reservation_max_advance_days', '30');
+      const maxAdvanceDays = parseInt(maxAdvanceDaysStr, 10);
+      const [y, m, d] = date.split('-').map(Number);
+      const targetDate = new Date(y, m - 1, d, 12, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > maxAdvanceDays) {
+        throw new BadRequestException(`La reserva no puede hacerse con más de ${maxAdvanceDays} día(s) de anticipación.`);
+      }
+    }
+
     // 2. Validar si el espacio está bloqueado administrativamente
     const overlappingBlock = await this.spaceBlockRepository.createQueryBuilder('block')
       .where('block.spaceId = :spaceId', { spaceId })
@@ -89,7 +103,8 @@ export class ReservationsService {
 
       // 5. Validar límite semanal del usuario (solo si no es admin)
       if (userRole !== 'admin') {
-        await this.checkWeeklyLimit(userId, date);
+        const weeklyLimit = await this.usersService.getWeeklyReservationLimit(userId, 3);
+        await this.checkWeeklyLimit(userId, date, weeklyLimit);
       }
 
       // 6. Revisar colisiones de horario (usando el manager de la transacción)
@@ -154,8 +169,7 @@ export class ReservationsService {
   /**
    * LÍMITE SEMANAL (SCRUM-34): Calcula el Lunes y Domingo de la fecha solicitada de forma segura.
    */
-  async checkWeeklyLimit(userId: string, targetDate: string): Promise<void> {
-    const MAX_RESERVATIONS_PER_WEEK = 3;
+  async checkWeeklyLimit(userId: string, targetDate: string, maxReservationsPerWeek = 3): Promise<void> {
 
     // 1. Desarmar el string 'YYYY-MM-DD' para evitar problemas de zona horaria UTC
     const [year, month, day] = targetDate.split('-').map(Number);
@@ -194,8 +208,8 @@ export class ReservationsService {
       },
     });
 
-    if (weeklyCount >= MAX_RESERVATIONS_PER_WEEK) {
-      throw new BadRequestException(`Has alcanzado el límite de ${MAX_RESERVATIONS_PER_WEEK} reservas para esta semana.`);
+    if (weeklyCount >= maxReservationsPerWeek) {
+      throw new BadRequestException(`Has alcanzado el límite de ${maxReservationsPerWeek} reservas para esta semana.`);
     }
   }
 
@@ -309,7 +323,7 @@ export class ReservationsService {
   /**
    * CANCELAR RESERVA: Permite a administradores cancelar cualquiera, y a usuarios solo la suya (validando plazos).
    */
-  async cancel(id: string, actingUser: { role: string; userId: string }) {
+  async cancel(id: string, actingUser: { role: string; userId: string }, reason?: string) {
     const reservation = await this.reservationRepository.findOne({ 
       where: { id },
       relations: ['user', 'space'] 
@@ -328,6 +342,7 @@ export class ReservationsService {
 
     // Enviar correo de cancelación
     if (reservation.user?.email) {
+      const reasonText = reason?.trim() || 'Sin motivo registrado';
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
           <h2 style="color: #990000;">Reserva Cancelada</h2>
@@ -337,6 +352,7 @@ export class ReservationsService {
             <tr style="background-color: #f2f2f2;"><td style="padding: 8px; font-weight: bold;">Espacio:</td><td style="padding: 8px;">${reservation.space?.name || 'N/A'}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">Fecha:</td><td style="padding: 8px;">${reservation.date}</td></tr>
             <tr style="background-color: #f2f2f2;"><td style="padding: 8px; font-weight: bold;">Horario:</td><td style="padding: 8px;">${reservation.startTime} - ${reservation.endTime}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Motivo:</td><td style="padding: 8px;">${reasonText}</td></tr>
           </table>
           <p style="margin-top: 20px; color: #555;">Si crees que esto es un error o tienes alguna consulta, por favor comunícate con administración.</p>
         </div>
