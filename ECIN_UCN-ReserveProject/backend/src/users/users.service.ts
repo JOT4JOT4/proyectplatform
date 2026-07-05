@@ -88,6 +88,19 @@ export class UsersService {
     return savedPenalty;
   }
 
+  async deletePenalty(userId: string, penaltyId: string): Promise<void> {
+    const penalty = await this.penaltiesRepository.findOne({
+      where: { id: penaltyId, user: { id: userId } },
+      relations: ['user'],
+    });
+
+    if (!penalty) {
+      throw new NotFoundException('Penalización no encontrada');
+    }
+
+    await this.penaltiesRepository.remove(penalty);
+  }
+
   async getPenalties(userId: string): Promise<UserPenalty[]> {
     return await this.penaltiesRepository.find({
       where: { user: { id: userId } },

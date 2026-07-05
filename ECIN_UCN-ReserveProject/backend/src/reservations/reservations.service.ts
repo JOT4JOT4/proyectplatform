@@ -103,7 +103,9 @@ export class ReservationsService {
 
       // 5. Validar límite semanal del usuario (solo si no es admin)
       if (userRole !== 'admin') {
-        const weeklyLimit = await this.usersService.getWeeklyReservationLimit(userId, 3);
+        const globalWeeklyLimitStr = await this.getSetting('reservation_weekly_limit', '3');
+        const globalWeeklyLimit = parseInt(globalWeeklyLimitStr, 10);
+        const weeklyLimit = await this.usersService.getWeeklyReservationLimit(userId, globalWeeklyLimit);
         await this.checkWeeklyLimit(userId, date, weeklyLimit);
       }
 

@@ -23,12 +23,34 @@ export type BackendUser = {
   lastName: string;
   picture?: string | null;
   role: string;
+  maxWeeklyReservations?: number | null;
+};
+
+export type UserPenalty = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  createdAt?: string;
+};
+
+export type UserWarning = {
+  id: string;
+  date: string;
+  reason: string;
 };
 
 export type AuthExchangeResponse = {
   message: string;
   access_token: string;
   user: BackendUser;
+};
+
+export type AdminSetting = {
+  id: string;
+  key: string;
+  value: string;
+  createdAt?: string;
 };
 
 export type Space = {

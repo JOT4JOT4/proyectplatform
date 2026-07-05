@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req, ForbiddenException, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req, ForbiddenException, Patch, Delete } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,6 +43,13 @@ export class UsersController {
       throw new ForbiddenException('No tienes permiso para ver esta información');
     }
     return this.usersService.getPenalties(userId);
+  }
+
+  @Delete(':userId/penalties/:penaltyId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  deletePenalty(@Param('userId') userId: string, @Param('penaltyId') penaltyId: string) {
+    return this.usersService.deletePenalty(userId, penaltyId);
   }
 
   @Get(':userId/warnings')
