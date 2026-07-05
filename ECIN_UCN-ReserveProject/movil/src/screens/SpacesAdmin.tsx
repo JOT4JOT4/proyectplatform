@@ -78,6 +78,7 @@ export default function SpacesAdmin() {
   const [activePicker, setActivePicker] = React.useState<FilterPicker>(null);
   const [showModal, setShowModal] = React.useState(false);
   const [editingSpace, setEditingSpace] = React.useState<Space | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<Space | null>(null);
   const [form, setForm] = React.useState<SpaceFormState>(EMPTY_FORM);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -219,29 +220,28 @@ export default function SpacesAdmin() {
     }
   };
 
-  const handleDelete = async (spaceId: string) => {
-    const targetSpace = spaces.find((space) => space.id === spaceId);
+  const handleDelete = (spaceId: string) => {
+    const targetSpace = spaces.find((space) => space.id === spaceId) ?? null;
+    setDeleteTarget(targetSpace);
+  };
 
-    Alert.alert('Eliminar espacio', `Vas a eliminar ${targetSpace?.name ?? 'este espacio'} de la base de datos. Esta acción no se puede deshacer.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsLoading(true);
-            await apiDelete(`/spaces/${spaceId}`, token);
-            setSelectedZone(null);
-            setSelectedType(null);
-            await loadSpaces();
-          } catch (requestError) {
-            Alert.alert('Error', requestError instanceof ApiError ? requestError.message : 'No se pudo eliminar');
-          } finally {
-            setIsLoading(false);
-          }
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await apiDelete(`/spaces/${deleteTarget.id}`, token);
+      setSelectedZone(null);
+      setSelectedType(null);
+      setDeleteTarget(null);
+      await loadSpaces();
+    } catch (requestError) {
+      Alert.alert('Error', requestError instanceof ApiError ? requestError.message : 'No se pudo eliminar');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleHide = async (spaceId: string) => {
@@ -452,6 +452,26 @@ export default function SpacesAdmin() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
                 <Text style={styles.primaryButtonText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={deleteTarget !== null} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.modalTitle}>Eliminar espacio</Text>
+            <Text style={styles.confirmText}>
+              Vas a eliminar {deleteTarget?.name ?? 'este espacio'} de la base de datos. Esta acción no se puede deshacer.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => setDeleteTarget(null)}>
+                <Text style={styles.secondaryButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dangerButton} onPress={confirmDelete}>
+                <Text style={styles.dangerButtonText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -668,11 +688,21 @@ const styles = StyleSheet.create({
     padding: 18,
     maxHeight: '92%',
   },
+  confirmCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 18,
+  },
   modalTitle: {
     color: '#081026',
     fontSize: 20,
     fontWeight: '800',
     marginBottom: 12,
+  },
+  confirmText: {
+    color: '#3D4B63',
+    lineHeight: 20,
+    marginBottom: 14,
   },
   pickerList: {
     maxHeight: 320,
@@ -830,6 +860,17 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#0059e9',
+    fontWeight: '700',
+  },
+  dangerButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#b42318',
+  },
+  dangerButtonText: {
+    color: '#fff',
     fontWeight: '700',
   },
   primaryButton: {
