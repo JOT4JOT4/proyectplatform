@@ -45,7 +45,21 @@ export class AuthController {
       const loginData = await this.authService.googleLogin(req);
       const code = this.authService.createLoginCode(loginData);
 
-      return res.redirect(`reservasucn://auth/callback?code=${code}`);
+      // Obtener el redirect_uri original de la mobile app desde el state
+      const state = req.query.state as string;
+      let redirectUrl = 'reservasucn://auth/callback';
+
+      if (state) {
+        const decoded = decodeURIComponent(state);
+        // Validar que el esquema sea permitido para evitar vulnerabilidades de Open Redirect
+        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
+        if (isAllowedScheme) {
+          redirectUrl = decoded;
+        }
+      }
+
+      const separator = redirectUrl.includes('?') ? '&' : '?';
+      return res.redirect(`${redirectUrl}${separator}code=${code}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo completar el inicio de sesión.';
       return res.json({ error: message });
