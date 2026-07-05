@@ -111,6 +111,7 @@ export class SpacesService {
     space.description = updateSpaceDto.description ?? space.description;
     space.imageUrl = updateSpaceDto.imageUrl ?? space.imageUrl;
     space.capacity = updateSpaceDto.capacity ?? space.capacity;
+    space.allowedTimeSlots = updateSpaceDto.allowedTimeSlots ?? space.allowedTimeSlots;
     space.isActive = updateSpaceDto.isActive ?? space.isActive;
 
     return await this.spaceRepository.save(space);

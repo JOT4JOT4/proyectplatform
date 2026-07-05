@@ -344,9 +344,6 @@ export class ReservationsService {
     if (actingUser.role !== 'admin' && reservation.user?.id !== actingUser.userId) {
       throw new ForbiddenException('No tienes permiso para cancelar esta reserva.');
     }
-    
-    reservation.status = ReservationStatus.CANCELLED;
-    const savedReservation = await this.reservationRepository.save(reservation);
 
     // Enviar correo de cancelación
     if (reservation.user?.email) {
@@ -371,6 +368,8 @@ export class ReservationsService {
         htmlContent
       );
     }
+
+    await this.reservationRepository.remove(reservation);
 
     // Si es usuario normal, validar plazos
     if (actingUser.role !== 'admin') {
@@ -399,7 +398,7 @@ export class ReservationsService {
       }
     }
 
-    return savedReservation;
+    return { message: 'Reserva eliminada correctamente.' };
   }
 
   /**

@@ -40,6 +40,7 @@ export default function ReservationsAdmin() {
   const [cancelTarget, setCancelTarget] = React.useState<ReservationRecord | null>(null);
   const [cancelReason, setCancelReason] = React.useState('');
   const [weeklyLimit, setWeeklyLimit] = React.useState('');
+  const [showHistory, setShowHistory] = React.useState(false);
 
   const loadReservations = React.useCallback(async () => {
     const data = await apiGet<ReservationRecord[]>('/reservations', token);
@@ -204,26 +205,53 @@ export default function ReservationsAdmin() {
   };
 
   const imminentThreshold = dayjs().add(IMMINENT_WINDOW_MINUTES, 'minute');
+  const now = dayjs();
+
+  const upcomingReservations = React.useMemo(() => {
+    return reservations
+      .filter((reservation) => {
+        const moment = toReservationMoment(reservation);
+        return moment.isSame(now, 'minute') || moment.isAfter(now);
+      })
+      .sort((left, right) => toReservationMoment(left).valueOf() - toReservationMoment(right).valueOf());
+  }, [now, reservations]);
+
+  const historyReservations = React.useMemo(() => {
+    return reservations
+      .filter((reservation) => toReservationMoment(reservation).isBefore(now))
+      .sort((left, right) => toReservationMoment(right).valueOf() - toReservationMoment(left).valueOf());
+  }, [now, reservations]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Reservas actuales</Text>
-      <Text style={styles.subheader}>Las reservas se ordenan por cercanía para identificar qué sala debes abrir primero.</Text>
+      <Text style={styles.subheader}>Solo verás reservas próximas en la lista principal; las vencidas quedan en historial para no sobrecargar la pantalla.</Text>
+
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryValue}>{upcomingReservations.length}</Text>
+          <Text style={styles.summaryLabel}>Próximas</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryValue}>{historyReservations.length}</Text>
+          <Text style={styles.summaryLabel}>Historial</Text>
+        </View>
+      </View>
 
       {loading ? <Text style={styles.note}>Cargando...</Text> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <FlatList
-        data={reservations}
+        data={upcomingReservations}
         keyExtractor={(reservation) => reservation.id}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={<Text style={styles.emptyState}>No hay reservas próximas para mostrar.</Text>}
         renderItem={({ item, index }) => {
           const reservationMoment = toReservationMoment(item);
           const isImminent = reservationMoment.isAfter(dayjs()) && reservationMoment.isBefore(imminentThreshold);
-          const isPastDue = reservationMoment.isBefore(dayjs()) && item.status !== 'completed' && item.status !== 'cancelled';
 
           return (
-            <View style={[styles.card, isImminent && styles.cardImminent, isPastDue && styles.cardPastDue]}>
+            <View style={[styles.card, isImminent && styles.cardImminent]}>
               <View style={styles.cardTopRow}>
                 <View style={styles.cardTitleWrap}>
                   <Text style={styles.cardTitle}>{index + 1}. {item.space?.name ?? 'Espacio desconocido'}</Text>
@@ -241,7 +269,6 @@ export default function ReservationsAdmin() {
               <Text style={styles.detailLine}>Bloque reservado: {item.startTime} - {item.endTime}</Text>
 
               {isImminent ? <Text style={styles.imminentText}>Abre esta sala ahora: inicia en menos de 20 minutos.</Text> : null}
-              {isPastDue ? <Text style={styles.pastDueText}>Este horario ya pasó y sigue pendiente de cierre.</Text> : null}
 
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.secondaryAction} onPress={() => openUserHistory(item.user?.id)}>
@@ -255,6 +282,28 @@ export default function ReservationsAdmin() {
           );
         }}
       />
+
+      <TouchableOpacity style={styles.historyToggle} onPress={() => setShowHistory((current) => !current)}>
+        <Text style={styles.historyToggleText}>{showHistory ? 'Ocultar historial' : 'Ver historial de reservas vencidas'}</Text>
+      </TouchableOpacity>
+
+      {showHistory ? (
+        <View style={styles.historySection}>
+          <Text style={styles.sectionTitle}>Historial de reservas vencidas</Text>
+          {historyReservations.length ? (
+            historyReservations.slice(0, 25).map((item) => (
+              <View key={item.id} style={styles.historyCard}>
+                <Text style={styles.historyTitle}>{item.space?.name ?? 'Espacio desconocido'}</Text>
+                <Text style={styles.historyMeta}>{item.date} • {item.startTime} - {item.endTime}</Text>
+                <Text style={styles.historyMeta}>Usuario: {item.user?.firstName ?? ''} {item.user?.lastName ?? ''}</Text>
+                <Text style={styles.historyStatus}>{getStatusLabel(item.status)}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyState}>No hay reservas vencidas registradas.</Text>
+          )}
+        </View>
+      ) : null}
 
       <Modal visible={showCancelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -367,7 +416,33 @@ const styles = StyleSheet.create({
     color: '#3D4B63',
     marginBottom: 14,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: '#F5F8FC',
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+  },
+  summaryValue: {
+    color: '#003057',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  summaryLabel: {
+    color: '#3D4B63',
+    fontWeight: '700',
+    marginTop: 4,
+  },
   note: {
+    color: '#3D4B63',
+    marginBottom: 10,
+  },
+  emptyState: {
     color: '#3D4B63',
     marginBottom: 10,
   },
@@ -441,11 +516,6 @@ const styles = StyleSheet.create({
   },
   imminentText: {
     color: '#dcfce7',
-    marginTop: 8,
-    fontWeight: '800',
-  },
-  pastDueText: {
-    color: '#fde68a',
     marginTop: 8,
     fontWeight: '800',
   },
@@ -550,6 +620,43 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  historyToggle: {
+    marginTop: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  historyToggleText: {
+    color: '#0059e9',
+    fontWeight: '800',
+  },
+  historySection: {
+    backgroundColor: '#F5F8FC',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+  },
+  historyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#D9E3F0',
+  },
+  historyTitle: {
+    color: '#081026',
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  historyMeta: {
+    color: '#3D4B63',
+    marginBottom: 3,
+  },
+  historyStatus: {
+    color: '#003057',
+    fontWeight: '700',
+    marginTop: 4,
   },
   sectionBox: {
     backgroundColor: '#F5F8FC',
