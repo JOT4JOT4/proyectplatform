@@ -8,6 +8,21 @@ import ConfigScreen from './ConfigScreen';
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = React.useState<'spaces' | 'reservations' | 'reservas' | 'config'>('spaces');
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'spaces':
+        return <SpacesAdmin />;
+      case 'reservations':
+        return <ReservationsAdmin />;
+      case 'reservas':
+        return <ReservasScreen />;
+      case 'config':
+        return <ConfigScreen />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Barra de pestañas */}
@@ -43,10 +58,7 @@ export default function AdminScreen() {
 
       {/* Contenido dinámico */}
       <View style={styles.content}>
-        {activeTab === 'spaces' && <SpacesAdmin />}
-        {activeTab === 'reservations' && <ReservationsAdmin />}
-        {activeTab === 'reservas' && <ReservasScreen />}
-        {activeTab === 'config' && <ConfigScreen />}
+        {renderContent()}
       </View>
     </View>
   );

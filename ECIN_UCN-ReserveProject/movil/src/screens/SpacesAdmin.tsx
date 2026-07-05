@@ -10,9 +10,11 @@ export default function SpacesAdmin() {
   const [showModal, setShowModal] = React.useState(false);
   const [editingSpace, setEditingSpace] = React.useState<Space | null>(null);
   const [name, setName] = React.useState('');
+  const [zone, setZone] = React.useState('');
+  const [type, setType] = React.useState<'room' | 'table'>('table');
 
   const loadSpaces = async () => {
-    const data = await apiGet<Space[]>('/spaces', token);
+    const data = await apiGet<Space[]>('/spaces/admin?page=1&limit=100', token);
     setSpaces(data);
   };
 
@@ -21,13 +23,14 @@ export default function SpacesAdmin() {
   const handleSave = async () => {
     try {
       if (editingSpace) {
-        await apiPatch(`/spaces/${editingSpace.id}`, { name }, token);
+        await apiPatch(`/spaces/${editingSpace.id}`, { name, zone, type }, token);
       } else {
-        await apiPost('/spaces', { name }, token);
+        await apiPost('/spaces', { name, zone, type }, token);
       }
       setShowModal(false);
       setEditingSpace(null);
       setName('');
+      setZone('');
       await loadSpaces();
     } catch (err) {
       Alert.alert('Error', err instanceof ApiError ? err.message : 'No se pudo guardar');
@@ -55,8 +58,8 @@ export default function SpacesAdmin() {
         keyExtractor={(s) => s.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text>{item.name}</Text>
-            <TouchableOpacity onPress={() => { setEditingSpace(item); setName(item.name); setShowModal(true); }}>
+            <Text>{item.name} ({item.zone})</Text>
+            <TouchableOpacity onPress={() => { setEditingSpace(item); setName(item.name); setZone(item.zone); setShowModal(true); }}>
               <Text>Editar</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleHide(item.id)}>
@@ -72,6 +75,7 @@ export default function SpacesAdmin() {
       <Modal visible={showModal} transparent>
         <View style={styles.modal}>
           <TextInput value={name} onChangeText={setName} placeholder="Nombre del espacio" />
+          <TextInput value={zone} onChangeText={setZone} placeholder="Zona" />
           <TouchableOpacity onPress={handleSave}><Text>Guardar</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => setShowModal(false)}><Text>Cancelar</Text></TouchableOpacity>
         </View>
