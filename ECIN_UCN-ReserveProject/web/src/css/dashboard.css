@@ -281,14 +281,10 @@
   background: rgba(0,0,0,0.25);
   display: flex;
   justify-content: center;
-<<<<<<< Updated upstream
   align-items: flex-start;
   overflow-y: auto;
   padding: 40px 20px;
 
-=======
-  align-items: center;
->>>>>>> Stashed changes
   z-index: 200;
 }
 
@@ -299,6 +295,19 @@
   border-radius: 30px;
   padding: 30px;
   position: relative;
+}
+
+.success-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: #d7f8df;
+  color: #14532d;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-weight: 700;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .close-modal {

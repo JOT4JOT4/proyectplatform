@@ -142,7 +142,13 @@ function formatTimeWithoutSeconds(timeStr?: string): string {
   return timeStr;
 }
 
-function mapBackendReservationToReservaGuardada(res: any): ReservaGuardada {
+type BackendReservation = AdminReservation & {
+  space?: Partial<Space>;
+};
+
+function mapBackendReservationToReservaGuardada(
+  res: BackendReservation,
+): ReservaGuardada {
   const space = res.space || {};
   const start = formatTimeWithoutSeconds(res.startTime);
   const end = formatTimeWithoutSeconds(res.endTime);
@@ -255,6 +261,8 @@ export default function Dashboard() {
   const [divisions, setDivisions] = useState(1);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
+  const [reserving, setReserving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const isSlotOccupied = (startTime: string, endTime: string) => {
     return occupiedSlots.some(
@@ -371,12 +379,6 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (vista === "misReservas") {
-      cargarMisReservas();
-    }
-  }, [vista]);
-
-  useEffect(() => {
     if (selectedReserva) {
       document.body.style.overflow = "hidden";
     } else {
@@ -387,49 +389,60 @@ export default function Dashboard() {
     };
   }, [selectedReserva]);
 
-  const handleReservar = async () => {
-    if (!selectedReserva || !selectedTimeSlot || !fecha) return;
+const handleReservar = async () => {
+  if (!selectedReserva || !selectedTimeSlot || !fecha) return;
 
-    let start = "";
-    let end = "";
+  const bloqueSeleccionado =
+    divisions > 1 && selectedTimeSlot.includes(" - Sub ")
+      ? (() => {
+          const baseBlockName = selectedTimeSlot.split(" - ")[0];
+          const baseBlock = BLOQUES_DISPONIBLES.find(
+            (b) => b.name === baseBlockName,
+          );
 
-    if (divisions > 1 && selectedTimeSlot.includes(" - Sub ")) {
-      const baseBlockName = selectedTimeSlot.split(" - ")[0];
-      const baseBlock = BLOQUES_DISPONIBLES.find((b) => b.name === baseBlockName);
-      if (!baseBlock) return;
-      const subs = getSubBlocks(baseBlock, divisions);
-      const subBlock = subs.find((s) => s.name === selectedTimeSlot);
-      if (!subBlock) return;
-      start = subBlock.startTime;
-      end = subBlock.endTime;
-    } else {
-      const baseBlock = BLOQUES_DISPONIBLES.find((b) => b.name === selectedTimeSlot);
-      if (!baseBlock) return;
-      start = baseBlock.startTime;
-      end = baseBlock.endTime;
-    }
+          if (!baseBlock) return null;
 
-    try {
-      await createReservation({
-        spaceId: String(selectedReserva.id),
-        date: fecha,
-        startTime: start,
-        endTime: end,
-      });
+          return getSubBlocks(baseBlock, divisions).find(
+            (s) => s.name === selectedTimeSlot,
+          );
+        })()
+      : BLOQUES_DISPONIBLES.find((b) => b.name === selectedTimeSlot);
 
-      await cargarMisReservas();
+  if (!bloqueSeleccionado) return;
+  setReserving(true);
+  setAvailabilityError("");
 
-      setSelectedReserva(null);
-      setSelectedBaseBlock("");
-      setSelectedTimeSlot("");
-      setOccupiedSlots([]);
-    } catch (error) {
-      console.error("Error creando reserva:", error);
-      setAvailabilityError(
-        error instanceof Error ? error.message : "No se pudo crear la reserva.",
-      );
-    }
-  };
+  try {
+    await createReservation({
+      spaceId: String(selectedReserva.id),
+      date: fecha,
+      startTime: bloqueSeleccionado.startTime,
+      endTime: bloqueSeleccionado.endTime,
+    });
+    await cargarMisReservas();
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setSuccessMessage("Reserva hecha con éxito.");
+
+    setSelectedReserva(null);
+    setSelectedBaseBlock("");
+    setSelectedTimeSlot("");
+    setOccupiedSlots([]);
+
+    setTimeout(() => {
+      setSuccessMessage("");
+    }, 2000);
+
+  } catch (error) {
+    console.error("Error creando reserva:", error);
+    setAvailabilityError(
+      error instanceof Error ? error.message : "No se pudo crear la reserva.",
+    );
+  }
+  finally {
+  setReserving(false);
+}
+};
 
   const openReservationDetail = (reserva: Reserva) => {
     setSelectedReserva(reserva);
@@ -439,13 +452,13 @@ export default function Dashboard() {
     setAvailabilityError("");
   };
 
-  const cargarReservasAdmin = async () => {
+  const cargarReservasAdmin = async (fechaFiltro?: string) => {
     try {
       setLoadingReservasAdmin(true);
       setErrorReservasAdmin("");
 
       const response: AdminReservation[] = await apiRequest("/reservations");
-      const fechaConsulta = fecha || obtenerFechaHoy();
+      const fechaConsulta = fechaFiltro || fecha || obtenerFechaHoy();
       const reservasDelDia = response.filter(
         (reserva) => reserva.date === fechaConsulta,
       );
@@ -487,6 +500,11 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-page">
+      {successMessage && (
+        <div className="success-toast">
+          {successMessage}
+        </div>
+      )}
       <nav className="top-navbar">
         <div className="navbar-left">
           <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}>
@@ -509,7 +527,10 @@ export default function Dashboard() {
 
           <button
             className="menu-option"
-            onClick={() => setVista("misReservas")}
+            onClick={() => {
+              setVista("misReservas");
+              cargarMisReservas();
+            }}
           >
             Reservas
           </button>
@@ -667,10 +688,24 @@ export default function Dashboard() {
             {vista === "adminReservas" &&
               !loadingReservasAdmin &&
               !errorReservasAdmin && (
-                <div className="empty-card">
-                  Reservas del día: {fecha || obtenerFechaHoy()}
-                </div>
-              )}
+                <>
+                  <div className="empty-card">
+                    Reservas del día: {fecha || obtenerFechaHoy()}
+                  </div>
+
+                  <div className="filter-box date-filter">
+                    <label>{fecha || "Fecha"}</label>
+                    <input
+                      type="date"
+                      value={fecha}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        setFecha(e.target.value);
+                        cargarReservasAdmin(e.target.value);
+                      }}
+                    />
+                  </div>
+                </>
+            )}
 
             {vista === "adminReservas" &&
               !loadingReservasAdmin &&
@@ -908,9 +943,9 @@ export default function Dashboard() {
                     <button
                       className="reserve-btn"
                       onClick={handleReservar}
-                      disabled={!selectedTimeSlot || !fecha}
+                      disabled={!selectedTimeSlot || !fecha || reserving}
                     >
-                      Reservar
+                      {reserving ? "Reservando..." : "Reservar"}
                     </button>
                   </div>
                 </div>
