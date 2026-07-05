@@ -29,6 +29,9 @@ export class Space {
   @Column({ type: 'int', default: 1 })
   capacity: number; 
 
+  @Column({ type: 'simple-array', nullable: true })
+  allowedTimeSlots: string[];
+
   @Column({ default: true })
   isActive: boolean; 
 

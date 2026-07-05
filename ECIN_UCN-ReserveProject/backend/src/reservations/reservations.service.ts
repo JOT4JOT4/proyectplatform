@@ -107,6 +107,12 @@ export class ReservationsService {
         await this.checkWeeklyLimit(userId, date, weeklyLimit);
       }
 
+      const requestedSlotKey = `${startTime}-${endTime}`;
+
+      if (Array.isArray(space.allowedTimeSlots) && space.allowedTimeSlots.length > 0 && !space.allowedTimeSlots.includes(requestedSlotKey)) {
+        throw new BadRequestException('El bloque solicitado no está permitido para este espacio.');
+      }
+
       // 6. Revisar colisiones de horario (usando el manager de la transacción)
       const overlappingReservations = await transactionalEntityManager.createQueryBuilder(Reservation, 'reservation')
         .where('reservation.spaceId = :spaceId', { spaceId })

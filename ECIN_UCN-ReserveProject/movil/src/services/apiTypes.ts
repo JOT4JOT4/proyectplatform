@@ -39,6 +39,7 @@ export type Space = {
   description?: string | null;
   imageUrl?: string | null;
   capacity?: number;
+  allowedTimeSlots?: string[];
   isActive?: boolean;
   createdAt?: string;
   subspaces?: Space[];

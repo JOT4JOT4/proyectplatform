@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { SpaceType } from '../entities/space.entity';
 
 export class CreateSpaceDto {
@@ -23,6 +23,11 @@ export class CreateSpaceDto {
 	@IsInt()
 	@Min(1)
 	capacity?: number;
+
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	allowedTimeSlots?: string[];
 
 	@IsOptional()
 	@IsBoolean()

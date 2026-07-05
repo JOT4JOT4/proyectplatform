@@ -13,6 +13,14 @@ type TimeSlot = {
   endTime: string;
 };
 
+type FilterPicker = 'zone' | 'type' | 'date' | null;
+
+type PickerOption = {
+  label: string;
+  value: string | null;
+  description?: string;
+};
+
 const TIME_SLOTS: TimeSlot[] = [
   { code: 'A', label: 'A 08:10 - 09:40', startTime: '08:10', endTime: '09:40' },
   { code: 'B', label: 'B 09:55 - 11:25', startTime: '09:55', endTime: '11:25' },
@@ -52,6 +60,10 @@ function getSlotLabel(slot: TimeSlot | null) {
   return slot?.label ?? 'Sin bloque seleccionado';
 }
 
+function getSlotKey(slot: TimeSlot) {
+  return `${slot.startTime}-${slot.endTime}`;
+}
+
 function buildDateOptions(daysAhead = 14) {
   return Array.from({ length: daysAhead }, (_, index) => {
     const date = dayjs().add(index, 'day');
@@ -73,7 +85,7 @@ export default function ReservasScreen() {
   const [selectedSlot, setSelectedSlot] = React.useState<TimeSlot | null>(null);
   const [availability, setAvailability] = React.useState<SpaceAvailability>(emptyAvailability);
   const [showSpaceModal, setShowSpaceModal] = React.useState(false);
-  const [showDateModal, setShowDateModal] = React.useState(false);
+  const [activePicker, setActivePicker] = React.useState<FilterPicker>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const dateOptions = React.useMemo(() => buildDateOptions(14), []);
@@ -144,18 +156,14 @@ export default function ReservasScreen() {
   }, [selectedSpace, selectedDate, token]);
 
   const filteredSpaces = React.useMemo(() => {
-  return spaces.filter((space) => {
-    if (search && !space.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (selectedZone && space.zone !== selectedZone) return false;
-    if (selectedType && space.type !== selectedType) return false;
+    return spaces.filter((space) => {
+      if (search && !space.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (selectedZone && space.zone !== selectedZone) return false;
+      if (selectedType && space.type !== selectedType) return false;
 
-    if (selectedSlot) {
-      const ocupado = availability.ocupiedSlots.some((occ) => overlaps(selectedSlot, occ));
-      if (ocupado) return false;
-    }
-    return true;
+      return true;
     });
-  }, [spaces, search, selectedZone, selectedType, selectedSlot, availability]);
+  }, [spaces, search, selectedZone, selectedType]);
 
 
   const uniqueZones = React.useMemo(() => Array.from(new Set(spaces.map((space) => space.zone).filter(Boolean))).sort(), [spaces]);
@@ -168,6 +176,66 @@ export default function ReservasScreen() {
     setSelectedSpace(space);
     setShowSpaceModal(true);
   };
+
+  const closePicker = () => setActivePicker(null);
+
+  const openPicker = (picker: Exclude<FilterPicker, null>) => setActivePicker(picker);
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedZone(null);
+    setSelectedType(null);
+    setSelectedDate(dayjs());
+    closePicker();
+  };
+
+  const getPickerTitle = () => {
+    switch (activePicker) {
+      case 'zone':
+        return 'Filtrar por zona';
+      case 'type':
+        return 'Filtrar por tipo';
+      case 'date':
+        return 'Filtrar por día';
+      default:
+        return '';
+    }
+  };
+
+  const getPickerOptions = (): PickerOption[] => {
+    switch (activePicker) {
+      case 'zone':
+        return [{ label: 'Todas las zonas', value: null }, ...uniqueZones.map((zone) => ({ label: zone, value: zone }))];
+      case 'type':
+        return [{ label: 'Todos los tipos', value: null }, ...uniqueTypes.map((type) => ({ label: type, value: type }))];
+      case 'date':
+        return dateOptions.map((option) => ({
+          label: option.label,
+          value: option.value.format('YYYY-MM-DD'),
+          description: option.shortLabel,
+        }));
+      default:
+        return [];
+    }
+  };
+
+  const selectPickerOption = (value: string | null) => {
+    if (activePicker === 'zone') {
+      setSelectedZone(value);
+    }
+
+    if (activePicker === 'type') {
+      setSelectedType(value);
+    }
+
+    if (activePicker === 'date' && value) {
+      setSelectedDate(dayjs(value));
+    }
+
+    closePicker();
+  };
+
+  const selectedDayLabel = selectedDate.isSame(dayjs(), 'day') ? 'Hoy' : selectedDate.format('DD/MM');
 
   const closeSpaceModal = () => {
     setShowSpaceModal(false);
@@ -205,52 +273,39 @@ export default function ReservasScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
-
       <Text style={styles.header}>Espacios disponibles</Text>
       <Text style={styles.subheader}>Consulta espacios y reserva un bloque disponible.</Text>
-      <TextInput style={styles.searchBar}
+      <View style={styles.searchWrap}>
+        <TextInput
+          style={styles.searchBar}
           placeholder="Buscar espacio por nombre..."
           value={search}
           onChangeText={setSearch}
-          />
-      <View style={styles.filtersRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {uniqueZones.map((zone) => (
-            <TouchableOpacity
-              key={zone}
-              style={[styles.filterChip, selectedZone === zone && styles.filterChipSelected]}
-              onPress={() => setSelectedZone(selectedZone === zone ? null : zone)}
-            >
-              <Text style={styles.filterChipText}>{zone}</Text>
-            </TouchableOpacity>
-          ))}
-          {uniqueTypes.map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.filterChip, selectedType === type && styles.filterChipSelected]}
-              onPress={() => setSelectedType(selectedType === type ? null : type)}
-            >
-              <Text style={styles.filterChipText}>{type}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        />
       </View>
-      <View style={styles.slotFilterRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {TIME_SLOTS.map((slot) => (
-            <TouchableOpacity
-              key={slot.code}
-              style={[styles.slotButton, selectedSlot?.code === slot.code && styles.slotButtonSelected]}
-              onPress={() => setSelectedSlot(selectedSlot?.code === slot.code ? null : slot)}
-            >
-              <Text style={[styles.slotButtonText, selectedSlot?.code === slot.code && styles.slotButtonTextSelected]}>
-                {slot.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+
+      <View style={styles.filterPanel}>
+        <Text style={styles.filterPanelTitle}>Filtros</Text>
+        <View style={styles.filterGrid}>
+          <TouchableOpacity style={styles.dropdownButton} onPress={() => openPicker('zone')}>
+            <Text style={styles.dropdownLabel}>Zona</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>{selectedZone ?? 'Todas'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.dropdownButton} onPress={() => openPicker('type')}>
+            <Text style={styles.dropdownLabel}>Tipo</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>{selectedType ?? 'Todos'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.dropdownButton} onPress={() => openPicker('date')}>
+            <Text style={styles.dropdownLabel}>Día</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>{selectedDayLabel}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
+          <Text style={styles.clearButtonText}>Limpiar filtros</Text>
+        </TouchableOpacity>
       </View>
 
 
@@ -272,28 +327,34 @@ export default function ReservasScreen() {
         )}
       />
 
-      <Modal visible={showDateModal} transparent animationType="fade">
+      <Modal visible={activePicker !== null} transparent animationType="fade">
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Selecciona fecha</Text>
-            <ScrollView style={styles.dateList} showsVerticalScrollIndicator={false}>
-              {dateOptions.map((option) => {
-                const selected = option.value.format('YYYY-MM-DD') === selectedDate.format('YYYY-MM-DD');
+            <Text style={styles.modalTitle}>{getPickerTitle()}</Text>
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {getPickerOptions().map((option) => {
+                const selected =
+                  (activePicker === 'date' && option.value === selectedDate.format('YYYY-MM-DD')) ||
+                  (activePicker === 'zone' && option.value === selectedZone) ||
+                  (activePicker === 'type' && option.value === selectedType) ||
+                  (option.value === null && ((activePicker === 'zone' && !selectedZone) || (activePicker === 'type' && !selectedType)));
 
                 return (
                   <TouchableOpacity
-                    key={option.value.format('YYYY-MM-DD')}
+                    key={`${option.label}-${option.value ?? 'all'}`}
                     style={[styles.dateOption, selected && styles.dateOptionSelected]}
-                    onPress={() => setSelectedDate(option.value)}
+                    onPress={() => selectPickerOption(option.value)}
                   >
                     <Text style={[styles.dateOptionLabel, selected && styles.dateOptionLabelSelected]}>{option.label}</Text>
-                    <Text style={[styles.dateOptionMeta, selected && styles.dateOptionMetaSelected]}>{option.shortLabel}</Text>
+                    {option.description ? (
+                      <Text style={[styles.dateOptionMeta, selected && styles.dateOptionMetaSelected]}>{option.description}</Text>
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
-            <Pressable style={styles.primaryButton} onPress={() => setShowDateModal(false)}>
-              <Text style={styles.primaryButtonText}>Usar fecha</Text>
+            <Pressable style={styles.primaryButton} onPress={closePicker}>
+              <Text style={styles.primaryButtonText}>Cerrar</Text>
             </Pressable>
           </View>
         </View>
@@ -335,6 +396,12 @@ export default function ReservasScreen() {
                   <Text style={styles.summaryLabel}>Disponibles</Text>
                   <Text style={styles.summaryValue}>{availableSlotsCount} bloques libres</Text>
                 </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Permitidos</Text>
+                  <Text style={styles.summaryValue} numberOfLines={2}>
+                    {selectedSpace?.allowedTimeSlots?.length ? selectedSpace.allowedTimeSlots.map((slotKey) => getSlotLabel(TIME_SLOTS.find((slot) => getSlotKey(slot) === slotKey) ?? null)).join(' · ') : 'Todos los bloques válidos'}
+                  </Text>
+                </View>
               </View>
 
               {selectedSpace?.description ? (
@@ -366,14 +433,16 @@ export default function ReservasScreen() {
               <View style={styles.slotGrid}>
                 {TIME_SLOTS.map((slot) => {
                   const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
+                  const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
+                  const disabled = occupied || !allowedBySpace;
                   const selected = selectedSlot?.code === slot.code;
 
                   return (
                     <TouchableOpacity
                       key={slot.code}
-                      style={[styles.slotButton, occupied && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                      onPress={() => !occupied && setSelectedSlot(slot)}
-                      disabled={occupied}
+                      style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                      onPress={() => !disabled && setSelectedSlot(slot)}
+                      disabled={disabled}
                     >
                       <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>{slot.label}</Text>
                     </TouchableOpacity>
@@ -403,24 +472,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     padding: 16,
   },
-  glowTop: {
-    position: 'absolute',
-    top: -60,
-    right: -50,
-    width: 180,
-    height: 180,
-    borderRadius: 180,
-    backgroundColor: '#003057',
-  },
-  glowBottom: {
-    position: 'absolute',
-    bottom: -80,
-    left: -50,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: '#003057',
-  },
   header: {
     color: '#003057',
     fontSize: 22,
@@ -431,20 +482,54 @@ const styles = StyleSheet.create({
     color: '#3D4B63',
     marginBottom: 14,
   },
-  filtersRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  searchWrap: {
     marginBottom: 12,
   },
-  filterChip: {
-    backgroundColor: '#003057',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+  filterPanel: {
+    backgroundColor: '#F5F8FC',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
   },
-  filterChipText: {
-    color: '#fff',
+  filterPanelTitle: {
+    color: '#081026',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  filterGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  dropdownButton: {
+    flexGrow: 1,
+    minWidth: '30%',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#D9E3F0',
+  },
+  dropdownLabel: {
+    color: '#3D4B63',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  dropdownValue: {
+    color: '#081026',
+    fontWeight: '800',
+  },
+  clearButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+  },
+  clearButtonText: {
+    color: '#0059e9',
     fontWeight: '700',
   },
   note: {
@@ -491,7 +576,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
   },
-  dateList: {
+  pickerList: {
     maxHeight: 320,
     marginBottom: 14,
   },
@@ -690,18 +775,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   searchBar: {
-  borderWidth: 1,
-  borderColor: '#ccc',
-  borderRadius: 8,
-  padding: 8,
-  marginBottom: 12,
-},
-filterChipSelected: {
-  backgroundColor: '#0059e9',
-},
-slotFilterRow: {
-  flexDirection: 'row',
-  marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D9E3F0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  filterChipSelected: {
+    backgroundColor: '#0059e9',
+  },
+  slotFilterRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
 },
   primaryButton: {
     flex: 1,
