@@ -26,10 +26,37 @@ export class ReservationsService {
     private readonly mailService: MailService,
   ) {}
 
+  private async markExpiredReservationsAsObsolete() {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const expiredReservations = await this.reservationRepository
+      .createQueryBuilder('reservation')
+      .where('reservation.status IN (:...statuses)', { statuses: [ReservationStatus.ACTIVE, ReservationStatus.PENDING] })
+      .andWhere('(reservation.date < :today OR (reservation.date = :today AND reservation.endTime <= :currentTime))', {
+        today,
+        currentTime,
+      })
+      .getMany();
+
+    if (expiredReservations.length === 0) {
+      return;
+    }
+
+    for (const reservation of expiredReservations) {
+      reservation.status = ReservationStatus.OBSOLETE;
+    }
+
+    await this.reservationRepository.save(expiredReservations);
+  }
+
   /**
    * CREAR RESERVA: Integra todas las validaciones de negocio, bloqueos, penalizaciones y notifica por correo.
    */
   async create(createReservationDto: CreateReservationDto, userId: string, userRole: string = 'user') {
+    await this.markExpiredReservationsAsObsolete();
+
     const { spaceId, date, startTime, endTime } = createReservationDto;
 
     if (startTime >= endTime) {
@@ -225,6 +252,8 @@ export class ReservationsService {
    * DISPONIBILIDAD (SCRUM-35): Devuelve las horas ocupadas de una sala un día específico.
    */
   async getOccupiedSlots(spaceId: string, date: string) {
+    await this.markExpiredReservationsAsObsolete();
+
     const reservations = await this.reservationRepository.find({
       where: {
         space: { id: spaceId },
@@ -251,6 +280,8 @@ export class ReservationsService {
    * OBTENER TODAS: Para paneles de administración
    */
   async findAll() {
+    await this.markExpiredReservationsAsObsolete();
+
     return await this.reservationRepository.find({
       relations: ['space', 'user'],
       order: { date: 'DESC', startTime: 'DESC' }
@@ -405,6 +436,8 @@ export class ReservationsService {
    * HISTORIAL DE RESERVAS (SCRUM-44)
    */
   async findByUser(userId: string) {
+    await this.markExpiredReservationsAsObsolete();
+
     return await this.reservationRepository.find({
       where: {
         user: { id: userId },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, SectionList } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { apiGet, apiPatch, ApiError } from '../services/apiClient';
 import type { ReservationRecord } from '../services/apiTypes';
@@ -59,6 +59,16 @@ export default function HistorialScreen() {
     setItems(data);
   }, [loadHistory]);
 
+  const activeReservations = React.useMemo(
+    () => items.filter((item) => item.status === 'pending' || item.status === 'active'),
+    [items],
+  );
+
+  const obsoleteReservations = React.useMemo(
+    () => items.filter((item) => item.status === 'obsolete'),
+    [items],
+  );
+
   const handleReservationAction = React.useCallback(
     async (reservationId: string, action: 'confirm' | 'cancel') => {
       if (!token) {
@@ -106,17 +116,23 @@ export default function HistorialScreen() {
       {isLoading ? <Text style={styles.note}>Cargando historial...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}
 
-      <FlatList
-        data={items}
+      <SectionList
+        sections={[
+          { title: 'Activas y pendientes', data: activeReservations },
+          { title: 'Obsoletas', data: obsoleteReservations },
+        ]}
         keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={<Text style={styles.emptyState}>Aún no tienes reservas registradas.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
+        renderSectionHeader={({ section }) => section.data.length ? <Text style={styles.sectionTitle}>{section.title}</Text> : null}
+        renderItem={({ item, section }) => (
+          <View style={[styles.row, item.status === 'obsolete' && styles.rowObsolete]}>
             <Text style={styles.rowTitle}>{item.space?.name ?? 'Espacio reservado'}</Text>
             <Text style={styles.rowMeta}>{item.date} • {item.startTime} - {item.endTime}</Text>
-            <Text style={styles.rowStatus}>{item.status}</Text>
+            <Text style={styles.rowStatus}>{item.status === 'obsolete' ? 'Obsoleta' : item.status}</Text>
 
-            {(item.status === 'pending' || item.status === 'active') ? (
+            {section.title === 'Activas y pendientes' ? (
               <View style={styles.actionsRow}>
                 {item.status === 'pending' ? (
                   <TouchableOpacity
@@ -186,11 +202,23 @@ const styles = StyleSheet.create({
     color: '#3D4B63',
     marginTop: 12,
   },
+  listContent: {
+    paddingBottom: 24,
+  },
+  sectionTitle: {
+    color: '#003057',
+    fontWeight: '800',
+    marginTop: 10,
+    marginBottom: 8,
+  },
   row: {
     padding: 14,
     borderRadius: 16,
     backgroundColor: '#003057',
     marginBottom: 12,
+  },
+  rowObsolete: {
+    backgroundColor: '#4b5563',
   },
   rowTitle: {
     color: '#fff',

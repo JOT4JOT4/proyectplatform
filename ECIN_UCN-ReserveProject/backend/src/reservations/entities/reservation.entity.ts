@@ -5,6 +5,7 @@ import { User } from '../../users/entities/user.entity';
 export enum ReservationStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
+  OBSOLETE = 'obsolete',
   CANCELLED = 'cancelled',
   COMPLETED = 'completed'
 }
@@ -27,9 +28,9 @@ export class Reservation {
   status: ReservationStatus;
 
   // RELACIONES
-  @ManyToOne(() => Space)
+  @ManyToOne(() => Space, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'spaceId' })
-  space: Space;
+  space: Space | null;
 
 
   @ManyToOne(() => User)

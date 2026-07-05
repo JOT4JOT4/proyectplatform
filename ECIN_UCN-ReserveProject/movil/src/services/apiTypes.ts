@@ -93,7 +93,7 @@ export type ReservationRecord = {
   date: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'active' | 'cancelled' | 'completed';
+  status: 'pending' | 'active' | 'obsolete' | 'cancelled' | 'completed';
   createdAt?: string;
   space?: Space;
   user?: BackendUser;

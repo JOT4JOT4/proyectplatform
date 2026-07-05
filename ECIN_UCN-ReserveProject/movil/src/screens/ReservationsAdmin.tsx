@@ -17,6 +17,8 @@ function getStatusLabel(status: ReservationRecord['status']) {
       return 'Activa';
     case 'pending':
       return 'Pendiente';
+    case 'obsolete':
+      return 'Obsoleta';
     case 'cancelled':
       return 'Cancelada';
     case 'completed':

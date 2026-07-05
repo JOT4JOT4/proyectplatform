@@ -220,7 +220,9 @@ export default function SpacesAdmin() {
   };
 
   const handleDelete = async (spaceId: string) => {
-    Alert.alert('Eliminar espacio', 'Esta acción quitará el espacio del sistema o lo desactivará si tiene reservas asociadas.', [
+    const targetSpace = spaces.find((space) => space.id === spaceId);
+
+    Alert.alert('Eliminar espacio', `Vas a eliminar ${targetSpace?.name ?? 'este espacio'} de la base de datos. Esta acción no se puede deshacer.`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -229,6 +231,8 @@ export default function SpacesAdmin() {
           try {
             setIsLoading(true);
             await apiDelete(`/spaces/${spaceId}`, token);
+            setSelectedZone(null);
+            setSelectedType(null);
             await loadSpaces();
           } catch (requestError) {
             Alert.alert('Error', requestError instanceof ApiError ? requestError.message : 'No se pudo eliminar');

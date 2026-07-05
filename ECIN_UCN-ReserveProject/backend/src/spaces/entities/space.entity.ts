@@ -35,7 +35,7 @@ export class Space {
   @Column({ default: true })
   isActive: boolean; 
 
-  @ManyToOne(() => Space, (space) => space.subspaces, { nullable: true })
+  @ManyToOne(() => Space, (space) => space.subspaces, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'parentId' })
   parent: Space | null;
 

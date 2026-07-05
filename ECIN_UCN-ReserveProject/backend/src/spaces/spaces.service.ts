@@ -123,14 +123,6 @@ export class SpacesService {
       throw new NotFoundException('El espacio no existe.');
     }
 
-    const reservationCount = await this.reservationRepository.count({ where: { space: { id } } });
-    const hasSubspaces = (space.subspaces?.length ?? 0) > 0;
-
-    if (reservationCount > 0 || hasSubspaces) {
-      space.isActive = false;
-      return await this.spaceRepository.save(space);
-    }
-
     return await this.spaceRepository.remove(space);
   }
 }
