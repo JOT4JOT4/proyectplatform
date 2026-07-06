@@ -925,24 +925,31 @@ const handleDeleteSpace = async (id: string) => {
                   No hay reservas para el día seleccionado.
                 </div>
             )}
-            
+
             {vista === "adminEspacios" && (
               <>
-                <div className="empty-card">
+                <div className="admin-section-title">
                   {editingSpaceId ? "Editar espacio" : "Crear nuevo espacio"}
                 </div>
 
-                {spaceError && <div className="empty-card">{spaceError}</div>}
-                {spaceMessage && <div className="empty-card">{spaceMessage}</div>}
+                {spaceError && <div className="form-message form-message-error">{spaceError}</div>}
+                {spaceMessage && (
+                  <div className="form-message form-message-success">{spaceMessage}</div>
+                )}
 
-                <div className="admin-reservation-card">
-                  <div className="admin-reservation-info">
+                <div className="space-form-card">
+                <div className="space-form-grid">
+                  <label>
+                    Nombre
                     <input
                       value={spaceForm.name}
                       onChange={(e) => setSpaceForm({ ...spaceForm, name: e.target.value })}
-                      placeholder="Nombre"
+                      placeholder="Ej: Sala de Estudio 101"
                     />
+                  </label>
 
+                  <label>
+                    Tipo
                     <select
                       value={spaceForm.type}
                       onChange={(e) =>
@@ -955,23 +962,22 @@ const handleDeleteSpace = async (id: string) => {
                       <option value="room">Sala</option>
                       <option value="table">Mesa</option>
                     </select>
+                  </label>
 
+                  <label>
+                    Área / zona
                     <input
                       value={spaceForm.zone}
                       onChange={(e) => setSpaceForm({ ...spaceForm, zone: e.target.value })}
-                      placeholder="Área / zona"
+                      placeholder="Ej: Biblioteca - Piso 2"
                     />
+                  </label>
 
-                    <input
-                      value={spaceForm.description}
-                      onChange={(e) =>
-                        setSpaceForm({ ...spaceForm, description: e.target.value })
-                      }
-                      placeholder="Descripción"
-                    />
-
+                  <label>
+                    Capacidad
                     <input
                       type="number"
+                      min="1"
                       value={spaceForm.capacity}
                       onChange={(e) =>
                         setSpaceForm({
@@ -979,28 +985,42 @@ const handleDeleteSpace = async (id: string) => {
                           capacity: Number(e.target.value),
                         })
                       }
-                      placeholder="Capacidad"
                     />
+                  </label>
 
+                  <label className="space-form-full">
+                    Descripción
+                    <textarea
+                      value={spaceForm.description}
+                      onChange={(e) =>
+                        setSpaceForm({ ...spaceForm, description: e.target.value })
+                      }
+                      placeholder="Describe el espacio..."
+                    />
+                  </label>
+
+                  <label className="space-form-full">
+                    URL imagen
                     <input
                       value={spaceForm.imageUrl}
                       onChange={(e) =>
                         setSpaceForm({ ...spaceForm, imageUrl: e.target.value })
                       }
-                      placeholder="URL imagen"
+                      placeholder="https://..."
                     />
-                  </div>
-
-                  <div className="admin-actions">
-                    <button className="slot-btn" type="button" onClick={handleSpaceSubmit}>
-                      {editingSpaceId ? "Actualizar" : "Crear"}
-                    </button>
-
-                    <button className="slot-btn" type="button" onClick={resetSpaceForm}>
-                      Limpiar
-                    </button>
-                  </div>
+                  </label>
                 </div>
+
+                <div className="space-form-actions">
+                  <button className="slot-btn" type="button" onClick={handleSpaceSubmit}>
+                    {editingSpaceId ? "Actualizar espacio" : "Crear espacio"}
+                  </button>
+
+                  <button className="slot-btn" type="button" onClick={resetSpaceForm}>
+                    {editingSpaceId ? "Cancelar edición" : "Limpiar"}
+                  </button>
+                </div>
+              </div>
 
                 {reservas.map((reserva) => (
                   <div className="admin-reservation-card" key={reserva.id}>
