@@ -1,5 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
-import { apiRequest, createReservation } from "../services/Api";
+import {apiRequest, createReservation, createSpace, updateSpace, deleteSpace,
+  type SpacePayload,
+} from "../services/Api";
 import logo from "../../assets/logo-ucn.png";
 import sala1 from "../../assets/sala indi.jpg";
 import sala2 from "../../assets/sala multi.jpg";
@@ -296,7 +298,22 @@ export default function Dashboard() {
   const [reservasAdmin, setReservasAdmin] = useState<AdminReservation[]>([]);
   const [loadingReservasAdmin, setLoadingReservasAdmin] = useState(false);
   const [errorReservasAdmin, setErrorReservasAdmin] = useState("");
-  const [vista, setVista] = useState<"salas" | "misReservas" | "adminReservas">("salas");
+
+  const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null);
+  const [spaceForm, setSpaceForm] = useState<SpacePayload>({
+    name: "",
+    type: "room",
+    zone: "",
+    description: "",
+    capacity: 1,
+    imageUrl: "",
+  });
+  const [spaceMessage, setSpaceMessage] = useState("");
+  const [spaceError, setSpaceError] = useState("");
+
+  const [vista, setVista] = useState<
+    "salas" | "misReservas" | "adminReservas" | "adminEspacios"
+  >("salas");
 
   useEffect(() => {
     async function cargarEspacios() {
@@ -457,6 +474,90 @@ export default function Dashboard() {
     setAvailabilityError("");
   };
 
+  const resetSpaceForm = () => {
+  setEditingSpaceId(null);
+  setSpaceForm({
+    name: "",
+    type: "room",
+    zone: "",
+    description: "",
+    capacity: 1,
+    imageUrl: "",
+  });
+  setSpaceError("");
+  setSpaceMessage("");
+};
+
+const handleSpaceSubmit = async () => {
+  try {
+    setSpaceError("");
+    setSpaceMessage("");
+
+    if (!spaceForm.name || !spaceForm.zone || !spaceForm.description) {
+      setSpaceError("Completa nombre, área y descripción.");
+      return;
+    }
+
+    if (spaceForm.capacity < 1) {
+      setSpaceError("La capacidad debe ser mayor a 0.");
+      return;
+    }
+
+    if (editingSpaceId) {
+      await updateSpace(editingSpaceId, spaceForm);
+      setSpaceMessage("Espacio actualizado correctamente.");
+    } else {
+      await createSpace(spaceForm);
+      setSpaceMessage("Espacio creado correctamente.");
+    }
+
+    resetSpaceForm();
+
+    const response = await apiRequest("/spaces?page=1&limit=50");
+    const backendSpaces: Space[] = response.data ?? response;
+    setReservas(backendSpaces.map(mapSpaceToReserva));
+  } catch (error) {
+    console.error(error);
+    setSpaceError("No se pudo guardar el espacio.");
+  }
+};
+
+const handleEditSpace = (reserva: Reserva) => {
+  setEditingSpaceId(String(reserva.id));
+  setSpaceForm({
+    name: reserva.sala,
+    type: reserva.tipo === "Sala" ? "room" : "table",
+    zone: reserva.area,
+    description: reserva.descripcion,
+    capacity: reserva.capacidad,
+    imageUrl: reserva.imagen || "",
+  });
+  setSpaceError("");
+  setSpaceMessage("");
+};
+
+const handleDeleteSpace = async (id: string) => {
+  const confirmar = window.confirm("¿Seguro que deseas eliminar este espacio?");
+
+  if (!confirmar) return;
+
+  try {
+    setSpaceError("");
+    setSpaceMessage("");
+
+    await deleteSpace(id);
+
+    setSpaceMessage("Espacio eliminado correctamente.");
+
+    const response = await apiRequest("/spaces?page=1&limit=50");
+    const backendSpaces: Space[] = response.data ?? response;
+    setReservas(backendSpaces.map(mapSpaceToReserva));
+  } catch (error) {
+    console.error(error);
+    setSpaceError("No se pudo eliminar el espacio.");
+  }
+};
+
   const cargarReservasAdmin = async (fechaFiltro?: string) => {
     try {
       setLoadingReservasAdmin(true);
@@ -578,6 +679,17 @@ export default function Dashboard() {
               }}
             >
               Reservas del día
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className="menu-option"
+              onClick={() => {
+                setVista("adminEspacios");
+                resetSpaceForm();
+              }}
+            >
+              Administrar salas
             </button>
           )}
           <button
@@ -812,7 +924,115 @@ export default function Dashboard() {
                 <div className="empty-card">
                   No hay reservas para el día seleccionado.
                 </div>
-              )}
+            )}
+            
+            {vista === "adminEspacios" && (
+              <>
+                <div className="empty-card">
+                  {editingSpaceId ? "Editar espacio" : "Crear nuevo espacio"}
+                </div>
+
+                {spaceError && <div className="empty-card">{spaceError}</div>}
+                {spaceMessage && <div className="empty-card">{spaceMessage}</div>}
+
+                <div className="admin-reservation-card">
+                  <div className="admin-reservation-info">
+                    <input
+                      value={spaceForm.name}
+                      onChange={(e) => setSpaceForm({ ...spaceForm, name: e.target.value })}
+                      placeholder="Nombre"
+                    />
+
+                    <select
+                      value={spaceForm.type}
+                      onChange={(e) =>
+                        setSpaceForm({
+                          ...spaceForm,
+                          type: e.target.value as "room" | "table",
+                        })
+                      }
+                    >
+                      <option value="room">Sala</option>
+                      <option value="table">Mesa</option>
+                    </select>
+
+                    <input
+                      value={spaceForm.zone}
+                      onChange={(e) => setSpaceForm({ ...spaceForm, zone: e.target.value })}
+                      placeholder="Área / zona"
+                    />
+
+                    <input
+                      value={spaceForm.description}
+                      onChange={(e) =>
+                        setSpaceForm({ ...spaceForm, description: e.target.value })
+                      }
+                      placeholder="Descripción"
+                    />
+
+                    <input
+                      type="number"
+                      value={spaceForm.capacity}
+                      onChange={(e) =>
+                        setSpaceForm({
+                          ...spaceForm,
+                          capacity: Number(e.target.value),
+                        })
+                      }
+                      placeholder="Capacidad"
+                    />
+
+                    <input
+                      value={spaceForm.imageUrl}
+                      onChange={(e) =>
+                        setSpaceForm({ ...spaceForm, imageUrl: e.target.value })
+                      }
+                      placeholder="URL imagen"
+                    />
+                  </div>
+
+                  <div className="admin-actions">
+                    <button className="slot-btn" type="button" onClick={handleSpaceSubmit}>
+                      {editingSpaceId ? "Actualizar" : "Crear"}
+                    </button>
+
+                    <button className="slot-btn" type="button" onClick={resetSpaceForm}>
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+
+                {reservas.map((reserva) => (
+                  <div className="admin-reservation-card" key={reserva.id}>
+                    <div className="admin-reservation-info">
+                      <h3>{reserva.sala}</h3>
+                      <span>
+                        {reserva.tipo} · {reserva.area} · Capacidad: {reserva.capacidad}
+                      </span>
+                      <span>{reserva.descripcion}</span>
+                    </div>
+
+                    <div className="admin-actions">
+                      <button
+                        type="button"
+                        className="slot-btn"
+                        onClick={() => handleEditSpace(reserva)}
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        className="slot-btn cancel-reservation-btn"
+                        onClick={() => handleDeleteSpace(String(reserva.id))}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </section>
 
           {selectedReserva && (
