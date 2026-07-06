@@ -67,3 +67,29 @@ export async function deleteSpace(id: string) {
     method: "DELETE",
   });
 }
+
+export type SpaceBlockPayload = {
+  spaceId: string;
+  startDate: string;
+  endDate: string;
+  startTime?: string;
+  endTime?: string;
+  reason: string;
+};
+
+export async function createSpaceBlock(data: SpaceBlockPayload) {
+  return apiRequest("/reservations/blocks", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getSpaceBlocks() {
+  return apiRequest("/reservations/blocks");
+}
+
+export async function deleteSpaceBlock(id: string) {
+  return apiRequest(`/reservations/blocks/${id}`, {
+    method: "DELETE",
+  });
+}

@@ -1,11 +1,20 @@
 import { useEffect, useState, type ChangeEvent } from "react";
-import {apiRequest, createReservation, createSpace, updateSpace, deleteSpace,
-  type SpacePayload,
-} from "../services/Api";
 import logo from "../../assets/logo-ucn.png";
 import sala1 from "../../assets/sala indi.jpg";
 import sala2 from "../../assets/sala multi.jpg";
 import "../css/dashboard.css";
+import {
+  apiRequest,
+  createReservation,
+  createSpace,
+  updateSpace,
+  deleteSpace,
+  createSpaceBlock,
+  getSpaceBlocks,
+  deleteSpaceBlock,
+  type SpacePayload,
+  type SpaceBlockPayload,
+} from "../services/Api";
 
 type Reserva = {
   id: string | number;
@@ -78,6 +87,19 @@ type TimeBlock = {
   name: string;
   startTime: string;
   endTime: string;
+};
+
+type SpaceBlock = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  reason: string;
+  space?: {
+    id?: string;
+    name?: string;
+  };
 };
 
 const BLOQUES_DISPONIBLES: TimeBlock[] = [
@@ -310,9 +332,22 @@ export default function Dashboard() {
   });
   const [spaceMessage, setSpaceMessage] = useState("");
   const [spaceError, setSpaceError] = useState("");
+  const [spaceBlocks, setSpaceBlocks] = useState<SpaceBlock[]>([]);
+  const [loadingSpaceBlocks, setLoadingSpaceBlocks] = useState(false);
+  const [spaceBlockMessage, setSpaceBlockMessage] = useState("");
+  const [spaceBlockError, setSpaceBlockError] = useState("");
+
+  const [spaceBlockForm, setSpaceBlockForm] = useState<SpaceBlockPayload>({
+    spaceId: "",
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+    reason: "",
+  });
 
   const [vista, setVista] = useState<
-    "salas" | "misReservas" | "adminReservas" | "adminEspacios"
+    "salas" | "misReservas" | "adminReservas" | "adminEspacios" | "adminBloqueos"
   >("salas");
 
   useEffect(() => {
@@ -475,88 +510,222 @@ export default function Dashboard() {
   };
 
   const resetSpaceForm = () => {
-  setEditingSpaceId(null);
-  setSpaceForm({
-    name: "",
-    type: "room",
-    zone: "",
-    description: "",
-    capacity: 1,
-    imageUrl: "",
-  });
-  setSpaceError("");
-  setSpaceMessage("");
-};
-
-const handleSpaceSubmit = async () => {
-  try {
+    setEditingSpaceId(null);
+    setSpaceForm({
+      name: "",
+      type: "room",
+      zone: "",
+      description: "",
+      capacity: 1,
+      imageUrl: "",
+    });
     setSpaceError("");
     setSpaceMessage("");
+  };
 
-    if (!spaceForm.name || !spaceForm.zone || !spaceForm.description) {
-      setSpaceError("Completa nombre, área y descripción.");
-      return;
+  const handleSpaceSubmit = async () => {
+    try {
+      setSpaceError("");
+      setSpaceMessage("");
+
+      if (!spaceForm.name || !spaceForm.zone || !spaceForm.description) {
+        setSpaceError("Completa nombre, área y descripción.");
+        return;
+      }
+
+      if (spaceForm.capacity < 1) {
+        setSpaceError("La capacidad debe ser mayor a 0.");
+        return;
+      }
+
+      if (editingSpaceId) {
+        await updateSpace(editingSpaceId, spaceForm);
+        setSpaceMessage("Espacio actualizado correctamente.");
+      } else {
+        await createSpace(spaceForm);
+        setSpaceMessage("Espacio creado correctamente.");
+      }
+
+      resetSpaceForm();
+
+      const response = await apiRequest("/spaces?page=1&limit=50");
+      const backendSpaces: Space[] = response.data ?? response;
+      setReservas(backendSpaces.map(mapSpaceToReserva));
+    } catch (error) {
+      console.error(error);
+      setSpaceError("No se pudo guardar el espacio.");
     }
+  };
 
-    if (spaceForm.capacity < 1) {
-      setSpaceError("La capacidad debe ser mayor a 0.");
-      return;
-    }
-
-    if (editingSpaceId) {
-      await updateSpace(editingSpaceId, spaceForm);
-      setSpaceMessage("Espacio actualizado correctamente.");
-    } else {
-      await createSpace(spaceForm);
-      setSpaceMessage("Espacio creado correctamente.");
-    }
-
-    resetSpaceForm();
-
-    const response = await apiRequest("/spaces?page=1&limit=50");
-    const backendSpaces: Space[] = response.data ?? response;
-    setReservas(backendSpaces.map(mapSpaceToReserva));
-  } catch (error) {
-    console.error(error);
-    setSpaceError("No se pudo guardar el espacio.");
-  }
-};
-
-const handleEditSpace = (reserva: Reserva) => {
-  setEditingSpaceId(String(reserva.id));
-  setSpaceForm({
-    name: reserva.sala,
-    type: reserva.tipo === "Sala" ? "room" : "table",
-    zone: reserva.area,
-    description: reserva.descripcion,
-    capacity: reserva.capacidad,
-    imageUrl: reserva.imagen || "",
-  });
-  setSpaceError("");
-  setSpaceMessage("");
-};
-
-const handleDeleteSpace = async (id: string) => {
-  const confirmar = window.confirm("¿Seguro que deseas eliminar este espacio?");
-
-  if (!confirmar) return;
-
-  try {
+  const handleEditSpace = (reserva: Reserva) => {
+    setEditingSpaceId(String(reserva.id));
+    setSpaceForm({
+      name: reserva.sala,
+      type: reserva.tipo === "Sala" ? "room" : "table",
+      zone: reserva.area,
+      description: reserva.descripcion,
+      capacity: reserva.capacidad,
+      imageUrl: reserva.imagen || "",
+    });
     setSpaceError("");
     setSpaceMessage("");
+  };
 
-    await deleteSpace(id);
+  const handleDeleteSpace = async (id: string) => {
+    const confirmar = window.confirm("¿Seguro que deseas eliminar este espacio?");
 
-    setSpaceMessage("Espacio eliminado correctamente.");
+    if (!confirmar) return;
 
-    const response = await apiRequest("/spaces?page=1&limit=50");
-    const backendSpaces: Space[] = response.data ?? response;
-    setReservas(backendSpaces.map(mapSpaceToReserva));
-  } catch (error) {
-    console.error(error);
-    setSpaceError("No se pudo eliminar el espacio.");
-  }
-};
+    try {
+      setSpaceError("");
+      setSpaceMessage("");
+
+      await deleteSpace(id);
+
+      setSpaceMessage("Espacio eliminado correctamente.");
+
+      const response = await apiRequest("/spaces?page=1&limit=50");
+      const backendSpaces: Space[] = response.data ?? response;
+      setReservas(backendSpaces.map(mapSpaceToReserva));
+    } catch (error) {
+      console.error(error);
+      setSpaceError("No se pudo eliminar el espacio.");
+    }
+  };
+
+  const resetSpaceBlockForm = () => {
+    setSpaceBlockForm({
+      spaceId: "",
+      startDate: "",
+      endDate: "",
+      startTime: "",
+      endTime: "",
+      reason: "",
+    });
+
+    setSpaceBlockError("");
+  };
+
+  const cargarSpaceBlocks = async () => {
+    try {
+      setLoadingSpaceBlocks(true);
+      setSpaceBlockError("");
+
+      const response = await getSpaceBlocks();
+
+      const blocks: SpaceBlock[] = response.data ?? response;
+
+      setSpaceBlocks(Array.isArray(blocks) ? blocks : []);
+    } catch (error) {
+      console.error("Error cargando bloqueos:", error);
+      setSpaceBlockError("No se pudieron cargar los bloqueos.");
+    } finally {
+      setLoadingSpaceBlocks(false);
+    }
+  };
+
+  const handleCreateSpaceBlock = async () => {
+    try {
+      setSpaceBlockError("");
+      setSpaceBlockMessage("");
+
+      if (
+        !spaceBlockForm.spaceId ||
+        !spaceBlockForm.startDate ||
+        !spaceBlockForm.endDate ||
+        !spaceBlockForm.reason.trim()
+      ) {
+        setSpaceBlockError(
+          "Debes seleccionar un espacio, las fechas y escribir un motivo.",
+        );
+        return;
+      }
+
+      if (spaceBlockForm.endDate < spaceBlockForm.startDate) {
+        setSpaceBlockError(
+          "La fecha final no puede ser anterior a la fecha inicial.",
+        );
+        return;
+      }
+
+      const tieneHoraInicio = Boolean(spaceBlockForm.startTime);
+      const tieneHoraFin = Boolean(spaceBlockForm.endTime);
+
+      if (tieneHoraInicio !== tieneHoraFin) {
+        setSpaceBlockError(
+          "Debes seleccionar ambas horas o dejar ambas vacías para bloquear el día completo.",
+        );
+        return;
+      }
+
+      if (
+        spaceBlockForm.startDate === spaceBlockForm.endDate &&
+        spaceBlockForm.startTime &&
+        spaceBlockForm.endTime &&
+        spaceBlockForm.endTime <= spaceBlockForm.startTime
+      ) {
+        setSpaceBlockError(
+          "La hora final debe ser posterior a la hora inicial.",
+        );
+        return;
+      }
+
+      const payload: SpaceBlockPayload = {
+        spaceId: spaceBlockForm.spaceId,
+        startDate: spaceBlockForm.startDate,
+        endDate: spaceBlockForm.endDate,
+        reason: spaceBlockForm.reason.trim(),
+      };
+
+      if (spaceBlockForm.startTime && spaceBlockForm.endTime) {
+        payload.startTime = spaceBlockForm.startTime;
+        payload.endTime = spaceBlockForm.endTime;
+      }
+
+      await createSpaceBlock(payload);
+
+      setSpaceBlockMessage("Horario bloqueado correctamente.");
+
+      resetSpaceBlockForm();
+
+      await cargarSpaceBlocks();
+    } catch (error) {
+      console.error("Error creando bloqueo:", error);
+
+      setSpaceBlockError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el bloqueo.",
+      );
+    }
+  };
+
+  const handleDeleteSpaceBlock = async (blockId: string) => {
+    const confirmar = window.confirm(
+      "¿Seguro que deseas eliminar este bloqueo?",
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setSpaceBlockError("");
+      setSpaceBlockMessage("");
+
+      await deleteSpaceBlock(blockId);
+
+      setSpaceBlockMessage("Bloqueo eliminado correctamente.");
+
+      await cargarSpaceBlocks();
+    } catch (error) {
+      console.error("Error eliminando bloqueo:", error);
+
+      setSpaceBlockError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar el bloqueo.",
+      );
+    }
+  };
 
   const cargarReservasAdmin = async (fechaFiltro?: string) => {
     try {
@@ -690,6 +859,18 @@ const handleDeleteSpace = async (id: string) => {
               }}
             >
               Administrar salas
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className="menu-option"
+              onClick={() => {
+                setVista("adminBloqueos");
+                resetSpaceBlockForm();
+                cargarSpaceBlocks();
+              }}
+            >
+              Bloquear horarios
             </button>
           )}
           <button
@@ -1060,6 +1241,178 @@ const handleDeleteSpace = async (id: string) => {
                     </div>
                   </div>
                 ))}
+              </>
+            )}
+            {vista === "adminBloqueos" && (
+              <>
+                <div className="admin-section-title">
+                  Bloquear horarios de salas
+                </div>
+
+                {spaceBlockError && (
+                  <div className="form-message form-message-error">
+                    {spaceBlockError}
+                  </div>
+                )}
+
+                {spaceBlockMessage && (
+                  <div className="form-message form-message-success">
+                    {spaceBlockMessage}
+                  </div>
+                )}
+
+                <div className="space-form-card">
+                  <div className="space-form-grid">
+                    <label>
+                      Espacio
+                      <select
+                        value={spaceBlockForm.spaceId}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            spaceId: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">Selecciona un espacio</option>
+                        {reservas.map((reserva) => (
+                          <option key={reserva.id} value={String(reserva.id)}>
+                            {reserva.sala}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Fecha inicio
+                      <input
+                        type="date"
+                        value={spaceBlockForm.startDate}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            startDate: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Fecha fin
+                      <input
+                        type="date"
+                        value={spaceBlockForm.endDate}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            endDate: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Hora inicio
+                      <input
+                        type="time"
+                        value={spaceBlockForm.startTime}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            startTime: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Hora fin
+                      <input
+                        type="time"
+                        value={spaceBlockForm.endTime}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            endTime: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="space-form-full">
+                      Motivo
+                      <textarea
+                        value={spaceBlockForm.reason}
+                        onChange={(e) =>
+                          setSpaceBlockForm({
+                            ...spaceBlockForm,
+                            reason: e.target.value,
+                          })
+                        }
+                        placeholder="Ej: Mantención, evento, limpieza, reparación..."
+                      />
+                    </label>
+                  </div>
+
+                  <div className="space-form-actions">
+                    <button
+                      type="button"
+                      className="slot-btn"
+                      onClick={handleCreateSpaceBlock}
+                    >
+                      Crear bloqueo
+                    </button>
+
+                    <button
+                      type="button"
+                      className="slot-btn"
+                      onClick={resetSpaceBlockForm}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+
+                {loadingSpaceBlocks && (
+                  <div className="empty-card">Cargando bloqueos...</div>
+                )}
+
+                {!loadingSpaceBlocks && spaceBlocks.length === 0 && (
+                  <div className="empty-card">
+                    No hay bloqueos registrados.
+                  </div>
+                )}
+
+                {!loadingSpaceBlocks &&
+                  spaceBlocks.map((block) => (
+                    <div className="admin-reservation-card" key={block.id}>
+                      <div className="admin-reservation-info">
+                        <h3>{block.space?.name || "Espacio sin nombre"}</h3>
+
+                        <span>
+                          {block.startDate} al {block.endDate}
+                        </span>
+
+                        <span>
+                          {block.startTime && block.endTime
+                            ? `${block.startTime} - ${block.endTime}`
+                            : "Día completo"}
+                        </span>
+
+                        <span>Motivo: {block.reason}</span>
+                      </div>
+
+                      <div className="admin-actions">
+                        <button
+                          type="button"
+                          className="slot-btn cancel-reservation-btn"
+                          onClick={() => handleDeleteSpaceBlock(block.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
               </>
             )}
           </section>
