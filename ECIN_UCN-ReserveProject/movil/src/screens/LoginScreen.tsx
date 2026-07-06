@@ -12,13 +12,13 @@ WebBrowser.maybeCompleteAuthSession();
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [isSigningIn, setIsSigningIn] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [warning, setWarning] = React.useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      setError(null);
+      setWarning(null);
       setIsSigningIn(true);
 
       // Usamos el esquema registrado en app.json
@@ -51,7 +51,8 @@ export default function LoginScreen() {
       const errorMsg = callbackUrl.searchParams.get('error');
 
       if (errorMsg) {
-        throw new Error(decodeURIComponent(errorMsg));
+        setWarning(decodeURIComponent(errorMsg));
+        return;
       }
 
       if (!code) {
@@ -72,7 +73,7 @@ export default function LoginScreen() {
         : signInError instanceof Error
           ? signInError.message
           : 'No se pudo iniciar sesión';
-      setError(message);
+      setWarning(message);
       console.warn('Failed to complete Google login', signInError);
     } finally {
       if (timeoutId) {
@@ -98,7 +99,7 @@ export default function LoginScreen() {
           <Text style={styles.kicker}>Acceso seguro</Text>
           <Text style={styles.subtitle}>Inicia sesión con tu cuenta institucional para reservar espacios</Text>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {warning ? <Text style={styles.warning}>{warning}</Text> : null}
 
           <TouchableOpacity style={styles.button} onPress={handleGoogleSignIn} disabled={isSigningIn}>
             {isSigningIn ? (
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
     color: '#ffffff', fontSize: 15, lineHeight: 21,
     marginBottom: 18, textAlign: 'center',
   },
-  error: { color: '#b42318', marginBottom: 14, textAlign: 'center' },
+  warning: { color: '#9a6700', marginBottom: 14, textAlign: 'center' },
   button: { backgroundColor: '#0059e9', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   googleLogo: { width: 20, height: 20 },

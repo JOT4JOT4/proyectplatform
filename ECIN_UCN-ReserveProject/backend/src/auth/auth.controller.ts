@@ -62,7 +62,19 @@ export class AuthController {
       return res.redirect(`${redirectUrl}${separator}code=${code}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo completar el inicio de sesión.';
-      return res.json({ error: message });
+      const state = req.query.state as string;
+      let redirectUrl = 'reservasucn://auth/callback';
+
+      if (state) {
+        const decoded = decodeURIComponent(state);
+        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
+        if (isAllowedScheme) {
+          redirectUrl = decoded;
+        }
+      }
+
+      const separator = redirectUrl.includes('?') ? '&' : '?';
+      return res.redirect(`${redirectUrl}${separator}error=${encodeURIComponent(message)}`);
     }
   }
 
