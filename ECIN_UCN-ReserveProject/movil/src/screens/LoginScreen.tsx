@@ -27,7 +27,7 @@ export default function LoginScreen() {
         path: 'auth/callback',
       });
 
-      // URL del backend en Railway (ejemplo)
+      // URL del backend en Railway
       const authUrl = `${GOOGLE_AUTH_URL}?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       const authSessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri);

@@ -244,6 +244,7 @@ describe('ReservationsService', () => {
       };
 
       (reservationRepository.findOne as jest.Mock).mockResolvedValue(mockRes);
+      (reservationRepository.save as jest.Mock).mockImplementation(async (reservation: Reservation) => reservation);
 
       const res = await service.cancel('res-1', { role: 'user', userId: mockUser.id });
       expect(res.status).toBe(ReservationStatus.CANCELLED);

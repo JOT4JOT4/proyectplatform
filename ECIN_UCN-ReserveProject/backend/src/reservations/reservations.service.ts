@@ -400,7 +400,8 @@ export class ReservationsService {
       );
     }
 
-    await this.reservationRepository.remove(reservation);
+    reservation.status = ReservationStatus.CANCELLED;
+    await this.reservationRepository.save(reservation);
 
     // Si es usuario normal, validar plazos
     if (actingUser.role !== 'admin') {
@@ -429,7 +430,7 @@ export class ReservationsService {
       }
     }
 
-    return { message: 'Reserva eliminada correctamente.' };
+    return reservation;
   }
 
   /**
