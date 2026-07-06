@@ -937,7 +937,7 @@ const handleDeleteSpace = async (id: string) => {
                   <div className="form-message form-message-success">{spaceMessage}</div>
                 )}
 
-                <div className="space-form-card">
+                <div className={`space-form-card ${editingSpaceId ? "editing" : ""}`}>
                 <div className="space-form-grid">
                   <label>
                     Nombre
@@ -978,6 +978,7 @@ const handleDeleteSpace = async (id: string) => {
                     <input
                       type="number"
                       min="1"
+                      max="20"
                       value={spaceForm.capacity}
                       onChange={(e) =>
                         setSpaceForm({
@@ -1000,7 +1001,7 @@ const handleDeleteSpace = async (id: string) => {
                   </label>
 
                   <label className="space-form-full">
-                    URL imagen
+                    Imagen del espacio (URL)
                     <input
                       value={spaceForm.imageUrl}
                       onChange={(e) =>
@@ -1023,16 +1024,24 @@ const handleDeleteSpace = async (id: string) => {
               </div>
 
                 {reservas.map((reserva) => (
-                  <div className="admin-reservation-card" key={reserva.id}>
-                    <div className="admin-reservation-info">
+                  <div className="admin-space-card" key={reserva.id}>
+                    <img
+                      src={reserva.imagen}
+                      alt={reserva.sala}
+                      className="admin-space-image"
+                    />
+
+                    <div className="admin-space-info">
                       <h3>{reserva.sala}</h3>
+
                       <span>
                         {reserva.tipo} · {reserva.area} · Capacidad: {reserva.capacidad}
                       </span>
-                      <span>{reserva.descripcion}</span>
+
+                      <p>{reserva.descripcion}</p>
                     </div>
 
-                    <div className="admin-actions">
+                    <div className="admin-space-actions">
                       <button
                         type="button"
                         className="slot-btn"
