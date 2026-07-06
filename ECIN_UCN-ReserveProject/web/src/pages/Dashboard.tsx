@@ -394,58 +394,59 @@ export default function Dashboard() {
   }, [selectedReserva]);
 
   const handleReservar = async () => {
-  if (!selectedReserva || !selectedTimeSlot || !fecha) return;
+    if (!selectedReserva || !selectedTimeSlot || !fecha) return;
 
-  const bloqueSeleccionado =
-    divisions > 1 && selectedTimeSlot.includes(" - Sub ")
-      ? (() => {
-          const baseBlockName = selectedTimeSlot.split(" - ")[0];
-          const baseBlock = BLOQUES_DISPONIBLES.find(
-            (b) => b.name === baseBlockName,
-          );
+    const bloqueSeleccionado =
+      divisions > 1 && selectedTimeSlot.includes(" - Sub ")
+        ? (() => {
+            const baseBlockName = selectedTimeSlot.split(" - ")[0];
+            const baseBlock = BLOQUES_DISPONIBLES.find(
+              (b) => b.name === baseBlockName,
+            );
 
-          if (!baseBlock) return null;
+            if (!baseBlock) return null;
 
-          return getSubBlocks(baseBlock, divisions).find(
-            (s) => s.name === selectedTimeSlot,
-          );
-        })()
-      : BLOQUES_DISPONIBLES.find((b) => b.name === selectedTimeSlot);
+            return getSubBlocks(baseBlock, divisions).find(
+              (s) => s.name === selectedTimeSlot,
+            );
+          })()
+        : BLOQUES_DISPONIBLES.find((b) => b.name === selectedTimeSlot);
 
-  if (!bloqueSeleccionado) return;
-  setReserving(true);
-  setAvailabilityError("");
+    if (!bloqueSeleccionado) return;
 
-  try {
-    await createReservation({
-      spaceId: String(selectedReserva.id),
-      date: fecha,
-      startTime: bloqueSeleccionado.startTime,
-      endTime: bloqueSeleccionado.endTime,
-    });
-    await cargarMisReservas();
+    setReserving(true);
+    setAvailabilityError("");
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setSuccessMessage("Reserva hecha con éxito.");
+    try {
+      await createReservation({
+        spaceId: String(selectedReserva.id),
+        date: fecha,
+        startTime: bloqueSeleccionado.startTime,
+        endTime: bloqueSeleccionado.endTime,
+      });
 
-    setSelectedReserva(null);
-    setSelectedBaseBlock("");
-    setSelectedTimeSlot("");
-    setOccupiedSlots([]);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    setTimeout(() => {
-      setSuccessMessage("");
-    }, 2000);
+      setSuccessMessage("Reserva hecha con éxito.");
 
-  } catch (error) {
-    console.error("Error creando reserva:", error);
-    setAvailabilityError(
-      error instanceof Error ? error.message : "No se pudo crear la reserva.",
-    );
-  }
-  finally {
-  setReserving(false);
-  }
+      setSelectedReserva(null);
+      setSelectedBaseBlock("");
+      setSelectedTimeSlot("");
+      setOccupiedSlots([]);
+
+      cargarMisReservas();
+
+      setTimeout(() => {
+        setSuccessMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error("Error creando reserva:", error);
+      setAvailabilityError(
+        error instanceof Error ? error.message : "No se pudo crear la reserva.",
+      );
+    } finally {
+      setReserving(false);
+    }
   };
 
   const openReservationDetail = (reserva: Reserva) => {
@@ -485,6 +486,9 @@ export default function Dashboard() {
 
       await apiRequest(`/reservations/${reservationId}/${action}`, {
         method: "PATCH",
+        body: action === "cancel"
+          ? JSON.stringify({ reason: "Cancelada por administrador desde web" })
+          : undefined,
       });
 
       await cargarReservasAdmin();
@@ -504,6 +508,9 @@ export default function Dashboard() {
 
     await apiRequest(`/reservations/${reservationId}/cancel`, {
       method: "PATCH",
+      body: JSON.stringify({
+        reason: "Cancelada desde frontend web",
+      }),
     });
 
     await cargarMisReservas();
