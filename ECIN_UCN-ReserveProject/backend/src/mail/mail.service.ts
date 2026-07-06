@@ -1,38 +1,58 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
   private readonly logger = new Logger(MailService.name);
 
-  constructor(private configService: ConfigService) {
-    const host = this.configService.get<string>('MAIL_HOST') || 'sandbox.smtp.mailtrap.io';
-    const port = this.configService.get<number>('MAIL_PORT') || 2525;
-    const user = this.configService.get<string>('MAIL_USER') || 'your_mailtrap_user_id';
-    const pass = this.configService.get<string>('MAIL_PASS') || 'your_mailtrap_password';
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      auth: {
-        user,
-        pass,
-      },
-    });
-  }
+  constructor(private configService: ConfigService) {}
 
   async sendMail(to: string, subject: string, html: string): Promise<boolean> {
     try {
+      const apiKey = this.configService.get<string>('MAIL_PASS') || '';
       const from = this.configService.get<string>('MAIL_FROM') || '"Sistema de Reservas UCN" <noreply@ucn.cl>';
-      const info = await this.transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
+
+      let fromName = 'Sistema de Reservas UCN';
+      let fromEmail = 'noreply@ucn.cl';
+
+      const match = from.match(/^(?:"?([^"]*)"?\s)?(?:<(.+)>)$/);
+      if (match) {
+        fromName = match[1]?.trim() || fromName;
+        fromEmail = match[2]?.trim() || fromEmail;
+      } else if (from.includes('@')) {
+        fromEmail = from.trim();
+        fromName = fromEmail.split('@')[0];
+      }
+
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': apiKey,
+          'content-type': 'application/json',
+        } as Record<string, string>,
+        body: JSON.stringify({
+          sender: {
+            name: fromName,
+            email: fromEmail,
+          },
+          to: [
+            {
+              email: to,
+            },
+          ],
+          subject,
+          htmlContent: html,
+        }),
       });
-      this.logger.log(`Correo enviado exitosamente a ${to}: ${info.messageId}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Brevo API responded with status ${response.status}: ${errorText}`);
+      }
+
+      const data = (await response.json()) as { messageId?: string };
+      this.logger.log(`Correo enviado exitosamente a ${to}: ${data.messageId || 'Success'}`);
       return true;
     } catch (error) {
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`);
@@ -40,3 +60,4 @@ export class MailService {
     }
   }
 }
+
