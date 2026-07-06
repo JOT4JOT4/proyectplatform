@@ -23,8 +23,10 @@ type Reserva = {
 };
 
 type ReservaGuardada = Reserva & {
+  reservationId: string;
   fechaReservada: string;
   horarioReservado: string;
+  status?: string;
 };
 
 type Space = {
@@ -159,6 +161,7 @@ function mapBackendReservationToReservaGuardada(
   const horarioReservado = bloqueCoincidente ? bloqueCoincidente.name : `${start} - ${end}`;
 
   return {
+    reservationId: res.id,
     id: space.id || "",
     sala: space.name || "Espacio",
     nombre: space.description || "Reserva de espacio",
@@ -175,6 +178,7 @@ function mapBackendReservationToReservaGuardada(
     imagen: space.imageUrl || (space.name === "EIC 102" ? sala2 : sala1),
     fechaReservada: res.date,
     horarioReservado: horarioReservado,
+    status: res.status,
   };
 }
 
@@ -441,8 +445,8 @@ export default function Dashboard() {
   }
   finally {
   setReserving(false);
-}
-};
+  }
+  };
 
   const openReservationDetail = (reserva: Reserva) => {
     setSelectedReserva(reserva);
@@ -494,9 +498,32 @@ export default function Dashboard() {
     }
   };
 
+  const cancelarMiReserva = async (reservationId: string) => {
+  try {
+    setErrorMisReservas("");
+
+    await apiRequest(`/reservations/${reservationId}/cancel`, {
+      method: "PATCH",
+    });
+
+    await cargarMisReservas();
+  } catch (error) {
+    console.error(error);
+    setErrorMisReservas("No se pudo cancelar la reserva.");
+    }
+  };
+
   const userEmail = localStorage.getItem("user_email") || "usuario@alumnos.ucn.cl";
   const userRole = localStorage.getItem("user_role");
   const isAdmin = userRole === "admin";
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("access_token");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("user_email");
+    localStorage.removeItem("user_role");
+    window.location.href = "/";
+  };
 
   return (
     <div className="dashboard-page">
@@ -546,6 +573,13 @@ export default function Dashboard() {
               Reservas del día
             </button>
           )}
+          <button
+            type="button"
+            className="menu-option logout-button"
+            onClick={handleLogout}
+          >
+            Cerrar sesión
+          </button>
         </aside>
 
       <main className={`dashboard-content ${menuOpen ? "menu-active" : ""}`}>
@@ -654,8 +688,10 @@ export default function Dashboard() {
             {vista === "misReservas" &&
               !loadingMisReservas &&
               !errorMisReservas &&
-              misReservas.map((reserva) => (
-                <button
+              misReservas
+                .filter((reserva) => reserva.status !== "cancelled")
+                .map((reserva) => (
+                <div
                   className="room-card"
                   key={`${reserva.id}-${reserva.fechaReservada}-${reserva.horarioReservado}`}
                 >
@@ -672,17 +708,25 @@ export default function Dashboard() {
                       {reserva.fechaReservada} · {reserva.horarioReservado}
                     </span>
                   </div>
-                </button>
+
+                  <button
+                    type="button"
+                    className="slot-btn cancel-reservation-btn"
+                    onClick={() => cancelarMiReserva(reserva.reservationId)}
+                  >
+                    Cancelar reserva
+                  </button>
+                </div>
               ))}
 
             {vista === "misReservas" &&
               !loadingMisReservas &&
               !errorMisReservas &&
-              misReservas.length === 0 && (
+              misReservas.filter((reserva) => reserva.status !== "cancelled").length === 0 && (
                 <div className="empty-card">
-                  No tienes reservas registradas.
+                  No tienes reservas activas.
                 </div>
-              )}
+            )}
 
             {vista === "adminReservas" && loadingReservasAdmin && (
               <div className="empty-card">Cargando reservas del día...</div>

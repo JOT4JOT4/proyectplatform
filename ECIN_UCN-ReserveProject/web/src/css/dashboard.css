@@ -495,6 +495,28 @@
 .reserve-btn:hover {
   background: #cf4f36;
 }
+.cancel-reservation-btn {
+  background-color: #c94f4f;
+  color: white;
+  border: 1px solid #a83e3e;
+}
+
+.cancel-reservation-btn:hover {
+  background-color: #b64040;
+}
+
+.logout-button {
+  margin-top: 14px;
+  background-color: transparent;
+  color: #c62828;
+  border: 3px solid #c62828;
+  font-weight: 600;
+}
+
+.logout-button:hover {
+  background-color: #c62828;
+  color: white;
+}
 
 .mesa-grid {
   background: #d3d3d3;
