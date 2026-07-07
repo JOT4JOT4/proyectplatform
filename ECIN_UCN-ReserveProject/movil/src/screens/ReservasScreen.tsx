@@ -64,10 +64,11 @@ function getSlotKey(slot: TimeSlot) {
   return `${slot.startTime}-${slot.endTime}`;
 }
 
-function isPastSlot(slot: TimeSlot, date: dayjs.Dayjs) {
+function isPastSlot(slot: { startTime: string; endTime: string }, date: dayjs.Dayjs) {
   const slotEnd = dayjs(`${date.format('YYYY-MM-DD')} ${slot.endTime}`, 'YYYY-MM-DD HH:mm');
   return slotEnd.isBefore(dayjs());
 }
+
 
 function splitSlot(slot: TimeSlot): TimeSlot[] {
   const start = dayjs(slot.startTime, 'HH:mm');
@@ -318,7 +319,7 @@ export default function ReservasScreen() {
         spaceId: selectedSpace.id,
         date: selectedDate.format('YYYY-MM-DD'),
         startTime: selectedSlot.startTime, // puede ser de bloque o subbloque
-        endTime: selectedSlot.endTime, 
+        endTime: selectedSlot.endTime,     // idem
       };
 
       await apiPost<ReservationRecord>('/reservations', payload, token);
