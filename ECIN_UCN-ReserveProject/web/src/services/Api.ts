@@ -116,3 +116,14 @@ export async function saveReservationSetting(
     }),
   });
 }
+
+export async function createBlockConfig(effectiveDate: string, divisions: number) {
+  return apiRequest("/reservations/block-config", {
+    method: "POST",
+    body: JSON.stringify({ effectiveDate, divisions }),
+  });
+}
+
+export async function getBlockConfigs() {
+  return apiRequest("/reservations/block-config");
+}
