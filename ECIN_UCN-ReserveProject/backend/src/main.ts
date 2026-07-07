@@ -14,8 +14,20 @@ async function bootstrap() {
   );
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const mobileFrontendUrl = process.env.MOBILE_FRONTEND_URL;
+
+  const allowedOrigins = [
+    frontendUrl,
+    'http://localhost:8081',
+    'http://localhost:8082',
+    'http://localhost:19006',
+  ];
+  if (mobileFrontendUrl) {
+    allowedOrigins.push(mobileFrontendUrl);
+  }
+
   app.enableCors({
-    origin: [frontendUrl],
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
