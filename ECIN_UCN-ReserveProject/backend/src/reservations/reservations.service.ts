@@ -144,12 +144,32 @@ export class ReservationsService {
           .andWhere('reservation.status IN (:...statuses)', { statuses: [ReservationStatus.ACTIVE, ReservationStatus.PENDING] })
           .getMany();
 
+        const requestedIndex = allowedSlots.findIndex(
+          (slot) => slot.startTime.slice(0, 5) === startTime.slice(0, 5) && slot.endTime.slice(0, 5) === endTime.slice(0, 5)
+        );
+
         const hasConsecutive = userReservationsToday.some((res) => {
           const dbStart = res.startTime.slice(0, 5);
           const dbEnd = res.endTime.slice(0, 5);
           const reqStart = startTime.slice(0, 5);
           const reqEnd = endTime.slice(0, 5);
-          return dbEnd === reqStart || dbStart === reqEnd;
+
+          // 1. Validar adyacencia de tiempo exacta
+          if (dbEnd === reqStart || dbStart === reqEnd) {
+            return true;
+          }
+
+          // 2. Validar adyacencia por índice en la lista cronológica (cubre breaks de 15 minutos entre bloques)
+          if (requestedIndex !== -1) {
+            const resIndex = allowedSlots.findIndex(
+              (slot) => slot.startTime.slice(0, 5) === dbStart && slot.endTime.slice(0, 5) === dbEnd
+            );
+            if (resIndex !== -1 && Math.abs(requestedIndex - resIndex) === 1) {
+              return true;
+            }
+          }
+
+          return false;
         });
 
         if (hasConsecutive) {
