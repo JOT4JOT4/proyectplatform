@@ -95,6 +95,14 @@ type TimeBlock = {
   endTime: string;
 };
 
+type BlockConfig = {
+  id?: string;
+  effectiveDate: string;
+  divisions: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type SpaceBlock = {
   id: string;
   startDate: string;
@@ -896,7 +904,7 @@ export default function Dashboard() {
   };
 
   const [effectiveDate, setEffectiveDate] = useState(obtenerFechaHoy());
-  const [blockConfigs, setBlockConfigs] = useState<any[]>([]);
+  const [blockConfigs, setBlockConfigs] = useState<BlockConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [configsError, setConfigsError] = useState("");
   const [configsMessage, setConfigsMessage] = useState("");
