@@ -25,7 +25,11 @@ export function validateRedirectUri(
     }
 
     // 2. Validate Expo development schemes (strictly allowed in non-production environments)
-    if (!isProd && (parsed.protocol === 'exp:' || parsed.protocol === 'exps:')) {
+    if (!isProd && (
+      parsed.protocol === 'exp:' || 
+      parsed.protocol === 'exps:' ||
+      (parsed.protocol === 'https:' && parsed.hostname === 'auth.expo.io')
+    )) {
       return true;
     }
 
