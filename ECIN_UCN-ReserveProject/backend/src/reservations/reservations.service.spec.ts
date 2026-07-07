@@ -193,6 +193,37 @@ describe('ReservationsService', () => {
         .rejects.toThrow(BadRequestException);
     });
 
+    it('should reject if standard user tries to book slots with a 15-minute gap (e.g. A and B) on the same day', async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 'res-consecutive-gap', date: '2026-06-30', startTime: '08:10', endTime: '09:40', status: ReservationStatus.PENDING }
+        ]),
+      };
+
+      jest.spyOn(reservationRepository.manager, 'transaction').mockImplementation(async (cb) => {
+        return cb({
+          findOne: jest.fn().mockResolvedValue(mockSpace),
+          createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+          create: jest.fn().mockImplementation((entityClass, dto) => dto),
+          save: jest.fn().mockImplementation((entityClass, entity) => Promise.resolve(entity)),
+        } as any);
+      });
+
+      const dto = {
+        spaceId: 'space-id-123',
+        date: '2026-06-30',
+        startTime: '09:55',
+        endTime: '11:25',
+      };
+
+      await expect(service.create(dto, mockUser.id, 'user'))
+        .rejects.toThrow(BadRequestException);
+    });
+
     it('should reject if standard user has an overlapping reservation at the same time', async () => {
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
