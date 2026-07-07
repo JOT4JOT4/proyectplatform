@@ -460,29 +460,58 @@ export default function ReservasScreen() {
               </ScrollView>
 
               <Text style={styles.sectionLabel}>Bloque a reservar</Text>
-              {subSlots.length > 0 && (
-                <View style={styles.subSlotGrid}>
-                  {subSlots.map((sub) => {
-                    const past = isPastSlot(sub, selectedDate);
-                    const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
-                    const disabled = past || occupied;
-                    const selected = selectedSlot?.code === sub.code;
+                <View style={styles.slotGrid}>
+                  {TIME_SLOTS.map((slot) => {
+                    const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
+                    const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
+                    const past = isPastSlot(slot, selectedDate);
+                    const disabled = occupied || !allowedBySpace || past;
+                    const selected = selectedSlot?.code === slot.code;
 
                     return (
                       <TouchableOpacity
-                        key={sub.code}
+                        key={slot.code}
                         style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                        onPress={() => !disabled && setSelectedSlot(sub)}
+                        onPress={() => {
+                          if (!disabled) {
+                            setSelectedSlot(slot);
+                            setSubSlots(splitSlot(slot)); // Generar subbloques al elegir bloque
+                          }
+                        }}
                         disabled={disabled}
                       >
                         <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
-                          {sub.label}{past ? ' (pasado)' : ''}
+                          {slot.label}{past ? ' (pasado)' : ''}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
+
+                {/* Renderizar subbloques si existen */}
+                {subSlots.length > 0 && (
+                  <View style={styles.subSlotGrid}>
+                    {subSlots.map((sub) => {
+                      const past = isPastSlot(sub, selectedDate);
+                      const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
+                      const disabled = past || occupied;
+                      const selected = selectedSlot?.code === sub.code;
+
+                      return (
+                        <TouchableOpacity
+                          key={sub.code}
+                          style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                          onPress={() => !disabled && setSelectedSlot(sub)}
+                          disabled={disabled}
+                        >
+                          <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
+                            {sub.label}{past ? ' (pasado)' : ''}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.secondaryButton} onPress={closeSpaceModal}>
@@ -823,12 +852,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
 },
-  subSlotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
+
+subSlotGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 12,
+},
   primaryButton: {
     flex: 1,
     borderRadius: 12,
