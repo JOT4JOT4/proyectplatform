@@ -1,17 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MailService } from './mail.service';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
+
+jest.mock('nodemailer');
 
 describe('MailService', () => {
   let service: MailService;
-  let mockFetch: jest.Mock;
+  let mockSendMail: jest.Mock;
 
   beforeEach(async () => {
-    mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ messageId: '12345' }),
+    mockSendMail = jest.fn().mockResolvedValue({ messageId: '12345' });
+    (nodemailer.createTransport as jest.Mock).mockReturnValue({
+      sendMail: mockSendMail,
     });
-    global.fetch = mockFetch;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -20,8 +22,10 @@ describe('MailService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              if (key === 'MAIL_PASS') return 'brevo-api-key';
-              if (key === 'MAIL_FROM') return '"Sistema de Reservas UCN" <noreply@ucn.cl>';
+              if (key === 'MAIL_HOST') return 'localhost';
+              if (key === 'MAIL_PORT') return 2525;
+              if (key === 'MAIL_USER') return 'user';
+              if (key === 'MAIL_PASS') return 'pass';
               return null;
             }),
           },
@@ -39,21 +43,16 @@ describe('MailService', () => {
   it('should send an email successfully', async () => {
     const result = await service.sendMail('test@example.com', 'Subject', '<p>Test</p>');
     expect(result).toBe(true);
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.brevo.com/v3/smtp/email',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.any(String),
-      }),
-    );
+    expect(mockSendMail).toHaveBeenCalledWith({
+      from: '"Sistema de Reservas UCN" <noreply@ucn.cl>',
+      to: 'test@example.com',
+      subject: 'Subject',
+      html: '<p>Test</p>',
+    });
   });
 
   it('should return false if sending email fails', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 400,
-      text: jest.fn().mockResolvedValue('API Error'),
-    });
+    mockSendMail.mockRejectedValue(new Error('SMTP Error'));
     const result = await service.sendMail('test@example.com', 'Subject', '<p>Test</p>');
     expect(result).toBe(false);
   });

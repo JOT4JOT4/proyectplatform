@@ -1,17 +1,12 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
 import { GoogleMobileGuard } from './guards/google-mobile.guard';
-import { ConfigService } from '@nestjs/config';
-import { validateRedirectUri } from './utils/redirect.utils';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   // --- Flujo Google Web (sin cambios) ---
   @Get('google')
@@ -56,13 +51,10 @@ export class AuthController {
 
       if (state) {
         const decoded = decodeURIComponent(state);
-        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-        const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
-
-        if (validateRedirectUri(decoded, frontendUrl, nodeEnv)) {
+        // Validar que el esquema sea permitido para evitar vulnerabilidades de Open Redirect
+        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
+        if (isAllowedScheme) {
           redirectUrl = decoded;
-        } else {
-          throw new BadRequestException('URL de redirección no permitida.');
         }
       }
 
@@ -75,13 +67,9 @@ export class AuthController {
 
       if (state) {
         const decoded = decodeURIComponent(state);
-        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-        const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
-
-        if (validateRedirectUri(decoded, frontendUrl, nodeEnv)) {
+        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
+        if (isAllowedScheme) {
           redirectUrl = decoded;
-        } else {
-          throw new BadRequestException(`No se pudo completar el inicio de sesión: ${message}`);
         }
       }
 

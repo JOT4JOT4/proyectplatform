@@ -68,7 +68,6 @@ describe('ReservationsService', () => {
       getPenalties: jest.fn().mockResolvedValue([]),
       createWarning: jest.fn(),
       createPenalty: jest.fn(),
-      getWeeklyReservationLimit: jest.fn().mockResolvedValue(3),
     };
 
     const mockMailService = {
@@ -192,11 +191,7 @@ describe('ReservationsService', () => {
     });
 
     it('should trigger UserWarning if user confirms reservation late', async () => {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const todayStr = new Date().toISOString().split('T')[0];
       const mockRes: Reservation = {
         id: 'res-1',
         date: todayStr,
@@ -236,11 +231,7 @@ describe('ReservationsService', () => {
 
   describe('cancel', () => {
     it('should trigger UserWarning if user cancels reservation late', async () => {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const todayStr = new Date().toISOString().split('T')[0];
       const mockRes: Reservation = {
         id: 'res-1',
         date: todayStr,
