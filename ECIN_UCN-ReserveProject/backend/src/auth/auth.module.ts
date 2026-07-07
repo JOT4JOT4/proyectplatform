@@ -9,14 +9,25 @@ import { UsersModule } from '../users/users.module';
 import { GoogleWebStrategy } from './google-web.strategy';
 import { GoogleMobileStrategy } from './google-mobile.strategy';
 import { GoogleMobileGuard } from './guards/google-mobile.guard';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'UCN-reservas-c9td5ij4n',
-      signOptions: { expiresIn: '1d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET configuration is missing!');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '1d' },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
