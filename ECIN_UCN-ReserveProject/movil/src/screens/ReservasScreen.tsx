@@ -69,6 +69,17 @@ function isPastSlot(slot: TimeSlot, date: dayjs.Dayjs) {
   return slotEnd.isBefore(dayjs());
 }
 
+function splitSlot(slot: TimeSlot): TimeSlot[] {
+  const start = dayjs(slot.startTime, 'HH:mm');
+  const end = dayjs(slot.endTime, 'HH:mm');
+  const mid = start.add(end.diff(start) / 2, 'millisecond');
+
+  return [
+    { code: slot.code + '-1', label: `${slot.code}a ${start.format('HH:mm')} - ${mid.format('HH:mm')}`, startTime: start.format('HH:mm'), endTime: mid.format('HH:mm') },
+    { code: slot.code + '-2', label: `${slot.code}b ${mid.format('HH:mm')} - ${end.format('HH:mm')}`, startTime: mid.format('HH:mm'), endTime: end.format('HH:mm') },
+  ];
+}
+
 
 function buildDateOptions(daysAhead = 14) {
   return Array.from({ length: daysAhead }, (_, index) => {
@@ -96,6 +107,8 @@ export default function ReservasScreen() {
   const [error, setError] = React.useState<string | null>(null);
   const dateOptions = React.useMemo(() => buildDateOptions(14), []);
   const [search, setSearch] = React.useState('');
+  const [subSlots, setSubSlots] = React.useState<TimeSlot[]>([]);
+
 
   const loadSpaces = React.useCallback(async () => {
     const response = await apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token);
@@ -447,26 +460,29 @@ export default function ReservasScreen() {
               </ScrollView>
 
               <Text style={styles.sectionLabel}>Bloque a reservar</Text>
-              <View style={styles.slotGrid}>
-                {TIME_SLOTS.map((slot) => {
-                  const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
-                  const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
-                  const past = isPastSlot(slot, selectedDate);
-                  const disabled = occupied || !allowedBySpace || past;
-                  const selected = selectedSlot?.code === slot.code;
+              {subSlots.length > 0 && (
+                <View style={styles.subSlotGrid}>
+                  {subSlots.map((sub) => {
+                    const past = isPastSlot(sub, selectedDate);
+                    const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
+                    const disabled = past || occupied;
+                    const selected = selectedSlot?.code === sub.code;
 
-                  return (
-                    <TouchableOpacity
-                      key={slot.code}
-                      style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                      onPress={() => !disabled && setSelectedSlot(slot)}
-                      disabled={disabled}
-                    >
-                      <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>{slot.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    return (
+                      <TouchableOpacity
+                        key={sub.code}
+                        style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                        onPress={() => !disabled && setSelectedSlot(sub)}
+                        disabled={disabled}
+                      >
+                        <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
+                          {sub.label}{past ? ' (pasado)' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.secondaryButton} onPress={closeSpaceModal}>
@@ -807,6 +823,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
 },
+  subSlotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
   primaryButton: {
     flex: 1,
     borderRadius: 12,
