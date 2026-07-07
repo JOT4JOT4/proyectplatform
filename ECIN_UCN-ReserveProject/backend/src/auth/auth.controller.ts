@@ -1,12 +1,17 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
 import { GoogleMobileGuard } from './guards/google-mobile.guard';
+import { ConfigService } from '@nestjs/config';
+import { validateRedirectUri } from './utils/redirect.utils';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // --- Flujo Google Web (sin cambios) ---
   @Get('google')
@@ -51,10 +56,19 @@ export class AuthController {
 
       if (state) {
         const decoded = decodeURIComponent(state);
-        // Validar que el esquema sea permitido para evitar vulnerabilidades de Open Redirect
-        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
-        if (isAllowedScheme) {
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+        const mobileFrontendUrl = this.configService.get<string>('MOBILE_FRONTEND_URL') || '';
+        const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
+
+        const allowedOrigins = [frontendUrl];
+        if (mobileFrontendUrl) {
+          allowedOrigins.push(mobileFrontendUrl);
+        }
+
+        if (validateRedirectUri(decoded, allowedOrigins, nodeEnv)) {
           redirectUrl = decoded;
+        } else {
+          throw new BadRequestException('URL de redirección no permitida.');
         }
       }
 
@@ -67,9 +81,19 @@ export class AuthController {
 
       if (state) {
         const decoded = decodeURIComponent(state);
-        const isAllowedScheme = /^(reservasucn|exp|exps|http|https):\/\//i.test(decoded);
-        if (isAllowedScheme) {
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+        const mobileFrontendUrl = this.configService.get<string>('MOBILE_FRONTEND_URL') || '';
+        const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
+
+        const allowedOrigins = [frontendUrl];
+        if (mobileFrontendUrl) {
+          allowedOrigins.push(mobileFrontendUrl);
+        }
+
+        if (validateRedirectUri(decoded, allowedOrigins, nodeEnv)) {
           redirectUrl = decoded;
+        } else {
+          throw new BadRequestException(`No se pudo completar el inicio de sesión: ${message}`);
         }
       }
 
