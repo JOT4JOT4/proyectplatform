@@ -424,21 +424,34 @@ export default function ReservasScreen() {
         </TouchableOpacity>
       </View>
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={selectedDate.toDate()}
-              mode="date"
-              display="calendar"
-              onChange={(event, date) => {
-                setShowDatePicker(false);
-                if (date) {
-                  setSelectedDate(dayjs(date));
-                }
-              }}
-            />
-          )}
-
-
+      {showDatePicker && (
+        <Modal transparent={true} animationType="fade">
+          <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.5)'
+          }}>
+            <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 8 }}>
+              <DateTimePicker
+                value={selectedDate.toDate()}
+                mode="date"
+                display="default"   // usa "default" para Android, "spinner"/"inline" para iOS
+                locale="es-ES"
+                onChange={(event, date) => {
+                  setShowDatePicker(false);
+                  if (date) {
+                    setSelectedDate(dayjs(date));
+                  }
+                }}
+              />
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={{ marginTop: 10, textAlign: 'center', color: 'blue' }}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {isLoading ? <Text style={styles.note}>Cargando información...</Text> : null}
       {error ? <Text style={styles.note}>{error}</Text> : null}
