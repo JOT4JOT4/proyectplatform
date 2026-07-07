@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "movil",
-    "slug": "movil",
+    "slug": "reservasucn",
     "version": "1.0.0",
     "scheme": "reservasucn",
     "platforms": [
@@ -39,8 +39,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "03f74e92-ccb7-4619-902b-7faa86206277"
+        "projectId": "e25a8379-4420-44e4-9c98-fbd50a666883"
       }
-    }
+    },
+    "owner": "annypercent"
   }
 }
