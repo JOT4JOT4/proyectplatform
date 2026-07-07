@@ -109,6 +109,42 @@ export default function ReservasScreen() {
   const [search, setSearch] = React.useState('');
   const [subSlots, setSubSlots] = React.useState<TimeSlot[]>([]);
 
+  // Función para cargar disponibilidad y subbloques desde backend
+  const loadAvailability = async (spaceId: string, date: dayjs.Dayjs) => {
+    try {
+      const data = await apiGet<SpaceAvailability>(
+        `/spaces/${spaceId}/availability?date=${date.format('YYYY-MM-DD')}`,
+        token
+      );
+
+      setAvailability(data);
+
+      // Si el backend devuelve divisiones configuradas
+      if (data.divisions && data.divisions.length > 0) {
+        // Mapear divisiones a subSlots
+        const mapped = data.divisions.map((div, idx) => ({
+          code: `${spaceId}-${idx}`,
+          label: `${div.startTime} - ${div.endTime}`,
+          startTime: div.startTime,
+          endTime: div.endTime,
+        }));
+        setSubSlots(mapped);
+      } else {
+        setSubSlots([]);
+      }
+
+      // Seleccionar primer slot disponible
+      const firstAvailableSlot =
+        TIME_SLOTS.find(
+          (slot) => !data.ocupiedSlots.some((occupied) => overlaps(slot, occupied))
+        ) ?? null;
+      setSelectedSlot(firstAvailableSlot);
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo cargar disponibilidad');
+      setAvailability(emptyAvailability);
+      setSubSlots([]);
+    }
+  };
 
   const loadSpaces = React.useCallback(async () => {
     const response = await apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token);
@@ -265,33 +301,38 @@ export default function ReservasScreen() {
 
   const handleConfirmReservation = async () => {
     if (!selectedSpace || !selectedSlot) {
-      Alert.alert('Falta información', 'Selecciona un espacio y un bloque horario.');
+      Alert.alert('Falta información', 'Selecciona un espacio y un bloque o subbloque horario.');
       return;
     }
 
+    // Validación de bloque pasado
     if (isPastSlot(selectedSlot, selectedDate)) {
-    Alert.alert('Bloque inválido', 'No puedes reservar en un horario que ya ocurrió.');
-    return;
+      Alert.alert('Reserva no permitida', 'No puedes reservar en un horario que ya ocurrió.');
+      return;
     }
 
     try {
       setIsLoading(true);
+
       const payload = {
         spaceId: selectedSpace.id,
         date: selectedDate.format('YYYY-MM-DD'),
-        startTime: selectedSlot.startTime,
-        endTime: selectedSlot.endTime,
+        startTime: selectedSlot.startTime, // puede ser de bloque o subbloque
+        endTime: selectedSlot.endTime, 
       };
 
       await apiPost<ReservationRecord>('/reservations', payload, token);
-      Alert.alert('Reserva creada', 'Tu solicitud fue enviada correctamente.');
+
+      Alert.alert('Reserva realizada', 'Tu reserva se pudo llevar a cabo.');
       closeSpaceModal();
       await loadSpaces();
     } catch (requestError) {
-      const message = requestError instanceof ApiError ? requestError.message : 'No se pudo crear la reserva.';
-      if (message.includes('límite semanal')) {
+      const message =
+        requestError instanceof ApiError ? requestError.message : 'No se pudo crear la reserva.';
+
+      if (message.toLowerCase().includes('límite semanal')) {
         Alert.alert('Reserva rechazada', 'Has alcanzado tu límite semanal de reservas.');
-      } else if (message.includes('tiempo máximo')) {
+      } else if (message.toLowerCase().includes('tiempo máximo')) {
         Alert.alert('Reserva rechazada', 'No puedes reservar fuera del tiempo máximo permitido.');
       } else {
         Alert.alert('Error', message);
@@ -300,6 +341,7 @@ export default function ReservasScreen() {
       setIsLoading(false);
     }
   };
+
 
   return (
     <View style={styles.container}>
@@ -460,58 +502,69 @@ export default function ReservasScreen() {
               </ScrollView>
 
               <Text style={styles.sectionLabel}>Bloque a reservar</Text>
-                <View style={styles.slotGrid}>
-                  {TIME_SLOTS.map((slot) => {
-                    const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
-                    const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
-                    const past = isPastSlot(slot, selectedDate);
-                    const disabled = occupied || !allowedBySpace || past;
-                    const selected = selectedSlot?.code === slot.code;
+              <View style={styles.slotGrid}>
+                {TIME_SLOTS.map((slot) => {
+                  const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
+                  const past = isPastSlot(slot, selectedDate);
+                  const disabled = occupied || past;
+                  const selected = selectedSlot?.code === slot.code;
+
+                  return (
+                    <TouchableOpacity
+                      key={slot.code}
+                      style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                      onPress={() => {
+                        if (!disabled) {
+                          setSelectedSlot(slot);
+                          // Si el backend devuelve divisiones, mapearlas a subSlots
+                          if (availability.divisions && availability.divisions.length > 0) {
+                            const mapped = availability.divisions.map((div, idx) => ({
+                              code: `${slot.code}-${idx}`,
+                              label: `${slot.code}${idx + 1} ${div.startTime} - ${div.endTime}`,
+                              startTime: div.startTime,
+                              endTime: div.endTime,
+                            }));
+                            setSubSlots(mapped);
+                          } else {
+                            setSubSlots([]);
+                          }
+                        }
+                      }}
+                      disabled={disabled}
+                    >
+                      <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
+                        {slot.label}{past ? ' (pasado)' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Renderizar subbloques si existen */}
+              {subSlots.length > 0 && (
+                <View style={styles.subSlotGrid}>
+                  {subSlots.map((sub) => {
+                    const past = isPastSlot(sub, selectedDate);
+                    const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
+                    const disabled = past || occupied;
+                    const selected = selectedSlot?.code === sub.code;
 
                     return (
                       <TouchableOpacity
-                        key={slot.code}
+                        key={sub.code}
                         style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                        onPress={() => {
-                          if (!disabled) {
-                            setSelectedSlot(slot);
-                            setSubSlots(splitSlot(slot)); // Generar subbloques al elegir bloque
-                          }
-                        }}
+                        onPress={() => !disabled && setSelectedSlot(sub)}
                         disabled={disabled}
                       >
                         <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
-                          {slot.label}{past ? ' (pasado)' : ''}
+                          {sub.label}{past ? ' (pasado)' : ''}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
+              )}
 
-                {/* Renderizar subbloques si existen */}
-                {subSlots.length > 0 && (
-                  <View style={styles.subSlotGrid}>
-                    {subSlots.map((sub) => {
-                      const past = isPastSlot(sub, selectedDate);
-                      const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
-                      const disabled = past || occupied;
-                      const selected = selectedSlot?.code === sub.code;
-
-                      return (
-                        <TouchableOpacity
-                          key={sub.code}
-                          style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
-                          onPress={() => !disabled && setSelectedSlot(sub)}
-                          disabled={disabled}
-                        >
-                          <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
-                            {sub.label}{past ? ' (pasado)' : ''}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.secondaryButton} onPress={closeSpaceModal}>
