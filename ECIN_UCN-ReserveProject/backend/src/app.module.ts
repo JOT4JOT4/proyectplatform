@@ -19,16 +19,20 @@ import { MailModule } from './mail/mail.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('DATABASE_URL');
-        const isProd = configService.get<string>('NODE_ENV') === 'production';
+        const nodeEnv = configService.get<string>('NODE_ENV') || 'development';
+        const isProd = nodeEnv === 'production';
         const ssl = configService.get<string>('DB_SSL') === 'true' || isProd;
+        
+        // Secure by default: reject unauthorized certs unless explicitly set to 'false'
+        const rejectUnauthorized = configService.get<string>('DB_SSL_REJECT_UNAUTHORIZED') !== 'false';
 
         if (url) {
           return {
             type: 'postgres',
             url,
             autoLoadEntities: true,
-            synchronize: true,
-            ssl: ssl ? { rejectUnauthorized: false } : false,
+            synchronize: !isProd,
+            ssl: ssl ? { rejectUnauthorized } : false,
           };
         }
 
@@ -40,8 +44,8 @@ import { MailModule } from './mail/mail.module';
           password: configService.get<string>('DB_PASS') || 'postgres',
           database: configService.get<string>('DB_NAME') || 'postgres',
           autoLoadEntities: true,
-          synchronize: true,
-          ssl: ssl ? { rejectUnauthorized: false } : false,
+          synchronize: !isProd,
+          ssl: ssl ? { rejectUnauthorized } : false,
         };
       },
     }),
