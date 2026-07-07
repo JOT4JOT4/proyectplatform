@@ -64,12 +64,6 @@ function getSlotKey(slot: TimeSlot) {
   return `${slot.startTime}-${slot.endTime}`;
 }
 
-function isPastSlot(slot: TimeSlot, date: dayjs.Dayjs) {
-  const slotEnd = dayjs(`${date.format('YYYY-MM-DD')} ${slot.endTime}`, 'YYYY-MM-DD HH:mm');
-  return slotEnd.isBefore(dayjs());
-}
-
-
 function buildDateOptions(daysAhead = 14) {
   return Array.from({ length: daysAhead }, (_, index) => {
     const date = dayjs().add(index, 'day');
@@ -256,11 +250,6 @@ export default function ReservasScreen() {
       return;
     }
 
-    if (isPastSlot(selectedSlot, selectedDate)) {
-    Alert.alert('Bloque inválido', 'No puedes reservar en un horario que ya ocurrió.');
-    return;
-    }
-
     try {
       setIsLoading(true);
       const payload = {
@@ -276,13 +265,7 @@ export default function ReservasScreen() {
       await loadSpaces();
     } catch (requestError) {
       const message = requestError instanceof ApiError ? requestError.message : 'No se pudo crear la reserva.';
-      if (message.includes('límite semanal')) {
-        Alert.alert('Reserva rechazada', 'Has alcanzado tu límite semanal de reservas.');
-      } else if (message.includes('tiempo máximo')) {
-        Alert.alert('Reserva rechazada', 'No puedes reservar fuera del tiempo máximo permitido.');
-      } else {
-        Alert.alert('Error', message);
-      }
+      Alert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }
@@ -451,7 +434,6 @@ export default function ReservasScreen() {
                 {TIME_SLOTS.map((slot) => {
                   const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
                   const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
-                  const past = isPastSlot(slot, selectedDate);
                   const disabled = occupied || !allowedBySpace;
                   const selected = selectedSlot?.code === slot.code;
 
