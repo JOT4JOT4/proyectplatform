@@ -136,6 +136,40 @@ export class ReservationsService {
         await this.checkWeeklyLimit(userId, date, weeklyLimit);
       }
 
+      // 5b. Validar que el usuario no tenga reservas consecutivas el mismo día (solo si no es admin)
+      if (userRole !== 'admin') {
+        const userReservationsToday = await transactionalEntityManager.createQueryBuilder(Reservation, 'reservation')
+          .where('reservation.userId = :userId', { userId })
+          .andWhere('reservation.date = :date', { date })
+          .andWhere('reservation.status IN (:...statuses)', { statuses: [ReservationStatus.ACTIVE, ReservationStatus.PENDING] })
+          .getMany();
+
+        const hasConsecutive = userReservationsToday.some((res) => {
+          return res.endTime === startTime || res.startTime === endTime;
+        });
+
+        if (hasConsecutive) {
+          throw new BadRequestException('No se permite reservar bloques consecutivos el mismo día.');
+        }
+      }
+
+      // 5c. Validar que el usuario no tenga otra reserva en el mismo horario (doble reserva)
+      if (userRole !== 'admin') {
+        const hasOverlapUser = await transactionalEntityManager.createQueryBuilder(Reservation, 'reservation')
+          .where('reservation.userId = :userId', { userId })
+          .andWhere('reservation.date = :date', { date })
+          .andWhere('reservation.status IN (:...statuses)', { statuses: [ReservationStatus.ACTIVE, ReservationStatus.PENDING] })
+          .andWhere(
+            '((reservation.startTime < :endTime AND reservation.endTime > :startTime))',
+            { startTime, endTime }
+          )
+          .getOne();
+
+        if (hasOverlapUser) {
+          throw new BadRequestException('Ya tienes una reserva o solicitud pendiente en este rango de horario.');
+        }
+      }
+
       const requestedSlotKey = `${startTime}-${endTime}`;
 
       if (Array.isArray(space.allowedTimeSlots) && space.allowedTimeSlots.length > 0 && !space.allowedTimeSlots.includes(requestedSlotKey)) {
