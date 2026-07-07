@@ -4,14 +4,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-    constructor() {
+  constructor() {
     super({
-        clientID: process.env.GOOGLE_CLIENT_ID || '',
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-        callbackURL: `${process.env.BACKEND_URL || 'https://proyectplatform-production.up.railway.app'}/auth/google/callback`,
-        scope: ['email', 'profile'],
+      clientID: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      callbackURL: `${process.env.BACKEND_URL || 'https://proyectplatform-production.up.railway.app'}/auth/google/callback`,
+      scope: ['email', 'profile'],
     });
-    }
+  }
 
   async validate(
     accessToken: string,
@@ -26,7 +26,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       return done(new UnauthorizedException('No se recibió correo de Google'), false);
     }
 
-    
+
     const allowedDomains = ['@alumnos.ucn.cl', '@ucn.cl'];
     const isAllowed = allowedDomains.some((domain) => email.endsWith(domain));
 

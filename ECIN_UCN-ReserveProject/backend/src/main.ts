@@ -13,14 +13,15 @@ async function bootstrap() {
     }),
   );
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const mobileFrontendUrl = process.env.MOBILE_FRONTEND_URL;
+  const frontendUrl = process.env.FRONTEND_URL || 'https://romantic-heart-production-7963.up.railway.app';
+  const mobileFrontendUrl = process.env.MOBILE_FRONTEND_URL || 'https://gregarious-renewal-production-88f0.up.railway.app';
 
   const allowedOrigins = [
-    frontendUrl,
+    'http://localhost:5173',
     'http://localhost:8081',
     'http://localhost:8082',
     'http://localhost:19006',
+    frontendUrl,
   ];
   if (mobileFrontendUrl) {
     allowedOrigins.push(mobileFrontendUrl);
