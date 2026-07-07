@@ -16,6 +16,8 @@ import {
   type SpaceBlockPayload,
   getReservationSettings,
   saveReservationSetting,
+  createBlockConfig,
+  getBlockConfigs,
 } from "../services/Api";
 
 type Reserva = {
@@ -893,6 +895,42 @@ export default function Dashboard() {
     }
   };
 
+  const [effectiveDate, setEffectiveDate] = useState(obtenerFechaHoy());
+  const [blockConfigs, setBlockConfigs] = useState<any[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [configsError, setConfigsError] = useState("");
+  const [configsMessage, setConfigsMessage] = useState("");
+
+  const cargarBlockConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+      setConfigsError("");
+      const response = await getBlockConfigs();
+      setBlockConfigs(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error("Error cargando subdivisiones:", error);
+      setConfigsError("No se pudieron cargar las configuraciones de subdivisiones.");
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
+
+  const guardarBlockConfig = async (divisions: number) => {
+    try {
+      setLoadingConfigs(true);
+      setConfigsError("");
+      setConfigsMessage("");
+      await createBlockConfig(effectiveDate, divisions);
+      setConfigsMessage(`Subdivisiones configuradas en ${divisions} para la fecha ${effectiveDate}.`);
+      await cargarBlockConfigs();
+    } catch (error) {
+      console.error("Error guardando subdivisiones:", error);
+      setConfigsError("No se pudo guardar la configuración de subdivisiones.");
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
+
   return (
     <div className="dashboard-page">
       {successMessage && (
@@ -970,6 +1008,7 @@ export default function Dashboard() {
               onClick={() => {
                 setVista("adminConfiguracion");
                 cargarReservationSettings();
+                cargarBlockConfigs();
               }}
             >
               Configuración
@@ -1626,6 +1665,115 @@ export default function Dashboard() {
                     >
                       Guardar configuración
                     </button>
+
+                    {/* Configuración de Subdivisiones */}
+                    <div style={{ marginTop: '40px', borderTop: '2px solid #eaedf3', paddingTop: '30px' }}>
+                      <div className="admin-section-title">
+                        Subdivisión de bloques por fecha
+                      </div>
+                      <div className="admin-config-subtitle">
+                        Configura en cuántas partes dividir los bloques base de 90 minutos para una fecha específica.
+                      </div>
+
+                      {configsError && (
+                        <div className="form-message form-message-error">
+                          {configsError}
+                        </div>
+                      )}
+
+                      {configsMessage && (
+                        <div className="form-message form-message-success">
+                          {configsMessage}
+                        </div>
+                      )}
+
+                      <div className="settings-card" style={{ marginBottom: '20px' }}>
+                        <h3>Seleccionar fecha de aplicación</h3>
+                        <input
+                          type="date"
+                          value={effectiveDate}
+                          onChange={(e) => setEffectiveDate(e.target.value)}
+                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #dcdfe6', marginTop: '10px' }}
+                        />
+                      </div>
+
+                      <div className="settings-card">
+                        <h3>Número de divisiones</h3>
+                        <p>Selecciona en cuántos sub-bloques dividir los horarios de la fecha seleccionada:</p>
+                        
+                        <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
+                          {[1, 2, 3, 4].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => guardarBlockConfig(num)}
+                              disabled={loadingConfigs}
+                              style={{
+                                flex: 1,
+                                padding: '12px 20px',
+                                border: '1px solid #0059e9',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                backgroundColor: '#fff',
+                                color: '#0059e9',
+                                fontWeight: '700',
+                                transition: 'all 0.2s',
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor = '#0059e9';
+                                e.currentTarget.style.color = '#fff';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fff';
+                                e.currentTarget.style.color = '#0059e9';
+                              }}
+                            >
+                              {num} {num === 1 ? 'Original' : `${num} Divs`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Historial de configuraciones */}
+                      <div className="settings-card" style={{ marginTop: '20px' }}>
+                        <h3>Configuraciones existentes</h3>
+                        {loadingConfigs ? (
+                          <p>Cargando configuraciones...</p>
+                        ) : blockConfigs.length === 0 ? (
+                          <p style={{ fontStyle: 'italic', color: '#909399' }}>No hay subdivisiones configuradas. Todos los días usan el formato original (1 división).</p>
+                        ) : (
+                          <div style={{ marginTop: '10px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                              <thead>
+                                <tr style={{ borderBottom: '1px solid #eaedf3', textAlign: 'left' }}>
+                                  <th style={{ padding: '8px 0', color: '#909399' }}>Fecha</th>
+                                  <th style={{ padding: '8px 0', color: '#909399' }}>Divisiones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {blockConfigs.map((config, index) => (
+                                  <tr key={index} style={{ borderBottom: '1px solid #f2f6fc' }}>
+                                    <td style={{ padding: '8px 0', fontWeight: '500' }}>{config.effectiveDate}</td>
+                                    <td style={{ padding: '8px 0' }}>
+                                      <span style={{
+                                        backgroundColor: config.divisions > 1 ? '#fff9e6' : '#e6eef8',
+                                        color: config.divisions > 1 ? '#ff9800' : '#0059e9',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontWeight: 'bold',
+                                        fontSize: '12px'
+                                      }}>
+                                        {config.divisions} {config.divisions === 1 ? 'división' : 'divisiones'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
               </>

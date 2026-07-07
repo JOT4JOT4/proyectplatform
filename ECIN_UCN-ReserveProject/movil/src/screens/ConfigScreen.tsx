@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
+import dayjs from 'dayjs';
 import { apiGet, apiPost, ApiError } from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import type { AdminSetting } from '../services/apiTypes';
@@ -13,6 +14,10 @@ export default function ConfigScreen() {
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const [effectiveDate, setEffectiveDate] = React.useState(dayjs().format('YYYY-MM-DD'));
+  const [blockConfigs, setBlockConfigs] = React.useState<any[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = React.useState(false);
+
   const loadSettings = React.useCallback(async () => {
     const settings = await apiGet<AdminSetting[]>('/reservations/settings', token);
     const getValue = (key: string) => settings.find((setting) => setting.key === key)?.value ?? '';
@@ -20,6 +25,18 @@ export default function ConfigScreen() {
     setReservationMaxAdvanceDays(getValue('reservation_max_advance_days'));
     setCancelDeadlineDays(getValue('cancel_deadline_days'));
     setWeeklyLimit(getValue('reservation_weekly_limit'));
+  }, [token]);
+
+  const loadBlockConfigs = React.useCallback(async () => {
+    try {
+      setLoadingConfigs(true);
+      const data = await apiGet<any[]>('/reservations/block-config', token);
+      setBlockConfigs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error loading block configs:', err);
+    } finally {
+      setLoadingConfigs(false);
+    }
   }, [token]);
 
   React.useEffect(() => {
@@ -30,6 +47,7 @@ export default function ConfigScreen() {
         setLoading(true);
         setError(null);
         await loadSettings();
+        await loadBlockConfigs();
       } catch (requestError) {
         if (active) {
           const message = requestError instanceof ApiError ? requestError.message : 'No se pudo cargar la configuración.';
@@ -45,7 +63,7 @@ export default function ConfigScreen() {
     return () => {
       active = false;
     };
-  }, [loadSettings]);
+  }, [loadSettings, loadBlockConfigs]);
 
   const saveConfig = async () => {
     if (!reservationMaxAdvanceDays.trim() || !cancelDeadlineDays.trim() || !weeklyLimit.trim()) {
@@ -62,6 +80,31 @@ export default function ConfigScreen() {
       await loadSettings();
     } catch (requestError) {
       Alert.alert('Error', requestError instanceof ApiError ? requestError.message : 'No se pudo guardar la configuración');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBlockConfig = async (divisions: number) => {
+    if (!effectiveDate.trim()) {
+      Alert.alert('Falta fecha', 'Ingresa una fecha en formato YYYY-MM-DD.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate.trim())) {
+      Alert.alert('Fecha inválida', 'La fecha debe estar en formato YYYY-MM-DD.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiPost('/reservations/block-config', {
+        effectiveDate: effectiveDate.trim(),
+        divisions
+      }, token);
+      Alert.alert('Éxito', `Subdivisiones configuradas en ${divisions} para ${effectiveDate.trim()}.`);
+      await loadBlockConfigs();
+    } catch (requestError) {
+      Alert.alert('Error', requestError instanceof ApiError ? requestError.message : 'No se pudo guardar la subdivisión.');
     } finally {
       setSaving(false);
     }
@@ -127,6 +170,53 @@ export default function ConfigScreen() {
         <TouchableOpacity style={styles.primaryButton} onPress={saveConfig} disabled={saving}>
           <Text style={styles.primaryButtonText}>{saving ? 'Guardando...' : 'Guardar configuración'}</Text>
         </TouchableOpacity>
+
+        {/* Sección de Subdivisiones */}
+        <View style={[styles.card, { marginTop: 24, borderTopWidth: 1, borderTopColor: '#D9E3F0', paddingTop: 16 }]}>
+          <Text style={[styles.label, { fontSize: 18, color: '#003057' }]}>Subdivisión de bloques</Text>
+          <Text style={styles.helper}>Configura en cuántos sub-bloques dividir los horarios de 90 minutos para una fecha específica.</Text>
+
+          <Text style={styles.label}>Seleccionar fecha (YYYY-MM-DD)</Text>
+          <TextInput
+            style={styles.input}
+            value={effectiveDate}
+            onChangeText={setEffectiveDate}
+            placeholder="Ej. 2026-07-20"
+          />
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Número de divisiones</Text>
+          <View style={styles.buttonRow}>
+            {[1, 2, 3, 4].map((num) => (
+              <TouchableOpacity
+                key={num}
+                style={styles.divisionButton}
+                onPress={() => saveBlockConfig(num)}
+                disabled={saving}
+              >
+                <Text style={styles.divisionButtonText}>
+                  {num} {num === 1 ? 'Orig' : 'Divs'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Historial de configuraciones en móvil */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Configuraciones existentes</Text>
+          {loadingConfigs ? (
+            <Text style={styles.note}>Cargando...</Text>
+          ) : blockConfigs.length === 0 ? (
+            <Text style={[styles.helper, { fontStyle: 'italic' }]}>No hay subdivisiones configuradas. Todos los días usan el formato original (1 división).</Text>
+          ) : (
+            blockConfigs.map((config, idx) => (
+              <View key={idx} style={styles.configItemRow}>
+                <Text style={styles.configDate}>{config.effectiveDate}</Text>
+                <Text style={styles.configDivisions}>{config.divisions} {config.divisions === 1 ? 'división' : 'divisiones'}</Text>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -212,6 +302,40 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
+    fontWeight: '800',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  divisionButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#003057',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  divisionButtonText: {
+    color: '#003057',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  configItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6EEF8',
+  },
+  configDate: {
+    color: '#081026',
+    fontWeight: '600',
+  },
+  configDivisions: {
+    color: '#0059e9',
     fontWeight: '800',
   },
 });
