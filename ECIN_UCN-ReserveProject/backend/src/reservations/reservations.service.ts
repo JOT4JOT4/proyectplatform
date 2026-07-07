@@ -145,7 +145,11 @@ export class ReservationsService {
           .getMany();
 
         const hasConsecutive = userReservationsToday.some((res) => {
-          return res.endTime === startTime || res.startTime === endTime;
+          const dbStart = res.startTime.slice(0, 5);
+          const dbEnd = res.endTime.slice(0, 5);
+          const reqStart = startTime.slice(0, 5);
+          const reqEnd = endTime.slice(0, 5);
+          return dbEnd === reqStart || dbStart === reqEnd;
         });
 
         if (hasConsecutive) {
