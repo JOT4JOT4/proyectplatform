@@ -40,4 +40,33 @@ describe('AuthService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('cleanExpiredLogins', () => {
+    it('should delete expired pending logins but keep active ones', () => {
+      const activeCode = service.createLoginCode({
+        message: 'Active',
+        access_token: 'active-token',
+        user: { id: 'u1' },
+      });
+
+      const expiredCode = 'expired-uuid-code';
+      // Access private map for testing
+      (service as any).pendingLogins.set(expiredCode, {
+        loginData: {
+          message: 'Expired',
+          access_token: 'expired-token',
+          user: { id: 'u2' },
+        },
+        expiresAt: Date.now() - 1000,
+      });
+
+      expect((service as any).pendingLogins.has(activeCode)).toBe(true);
+      expect((service as any).pendingLogins.has(expiredCode)).toBe(true);
+
+      service.cleanExpiredLogins();
+
+      expect((service as any).pendingLogins.has(activeCode)).toBe(true);
+      expect((service as any).pendingLogins.has(expiredCode)).toBe(false);
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service'; 
 import { randomUUID } from 'crypto';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 type LoginData = {
   message: string;
@@ -73,5 +74,15 @@ export class AuthService {
     }
 
     return pendingLogin.loginData;
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  cleanExpiredLogins() {
+    const now = Date.now();
+    for (const [code, pendingLogin] of this.pendingLogins.entries()) {
+      if (pendingLogin.expiresAt < now) {
+        this.pendingLogins.delete(code);
+      }
+    }
   }
 }

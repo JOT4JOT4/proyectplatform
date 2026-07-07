@@ -8,9 +8,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SpacesModule } from './spaces/spaces.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { MailModule } from './mail/mail.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     UsersModule, 
     AuthModule,
     ConfigModule.forRoot({isGlobal: true,}),
