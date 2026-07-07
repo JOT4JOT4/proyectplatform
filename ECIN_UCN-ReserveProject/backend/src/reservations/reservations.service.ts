@@ -172,8 +172,14 @@ export class ReservationsService {
 
       const requestedSlotKey = `${startTime}-${endTime}`;
 
-      if (Array.isArray(space.allowedTimeSlots) && space.allowedTimeSlots.length > 0 && !space.allowedTimeSlots.includes(requestedSlotKey)) {
-        throw new BadRequestException('El bloque solicitado no está permitido para este espacio.');
+      if (Array.isArray(space.allowedTimeSlots) && space.allowedTimeSlots.length > 0) {
+        const isAllowed = space.allowedTimeSlots.some((allowedSlotKey) => {
+          const [allowedStart, allowedEnd] = allowedSlotKey.split('-');
+          return allowedStart <= startTime && allowedEnd >= endTime;
+        });
+        if (!isAllowed) {
+          throw new BadRequestException('El bloque solicitado no está permitido para este espacio.');
+        }
       }
 
       // 6. Revisar colisiones de horario (usando el manager de la transacción)

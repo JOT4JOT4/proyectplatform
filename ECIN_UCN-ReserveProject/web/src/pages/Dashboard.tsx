@@ -300,7 +300,7 @@ export default function Dashboard() {
 
   const isSlotOccupied = (startTime: string, endTime: string) => {
     return occupiedSlots.some(
-      (occupied) => occupied.startTime === startTime && occupied.endTime === endTime,
+      (occupied) => occupied.startTime < endTime && occupied.endTime > startTime,
     );
   };
 

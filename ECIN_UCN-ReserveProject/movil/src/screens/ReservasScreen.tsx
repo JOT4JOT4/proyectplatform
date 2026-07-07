@@ -52,8 +52,12 @@ function normalizeSpacesResponse(response: SpacesResponse | Space[] | { data?: S
   return [];
 }
 
-function overlaps(slot: TimeSlot, occupied: OccupiedSlot) {
+function overlaps(slot: { startTime: string; endTime: string }, occupied: { startTime: string; endTime: string }) {
   return slot.startTime < occupied.endTime && slot.endTime > occupied.startTime;
+}
+
+function isSlotOccupied(startTime: string, endTime: string, occupiedSlots: OccupiedSlot[]) {
+  return occupiedSlots.some((occupied) => overlaps({ startTime, endTime }, occupied));
 }
 
 function getSlotLabel(slot: TimeSlot | null) {
@@ -67,6 +71,59 @@ function getSlotKey(slot: TimeSlot) {
 function isPastSlot(slot: { startTime: string; endTime: string }, date: dayjs.Dayjs) {
   const slotEnd = dayjs(`${date.format('YYYY-MM-DD')} ${slot.endTime}`, 'YYYY-MM-DD HH:mm');
   return slotEnd.isBefore(dayjs());
+}
+
+function getSubBlocks(baseBlock: TimeSlot, divisions: number): TimeSlot[] {
+  if (divisions <= 1) return [baseBlock];
+
+  const [startH, startM] = baseBlock.startTime.split(':').map(Number);
+  const [endH, endM] = baseBlock.endTime.split(':').map(Number);
+
+  const startTotalMinutes = startH * 60 + startM;
+  const endTotalMinutes = endH * 60 + endM;
+  const totalDuration = endTotalMinutes - startTotalMinutes;
+
+  const slotDuration = Math.floor(totalDuration / divisions);
+  const subBlocks: TimeSlot[] = [];
+
+  for (let i = 0; i < divisions; i++) {
+    const slotStartTotal = startTotalMinutes + i * slotDuration;
+    const slotEndTotal = slotStartTotal + slotDuration;
+
+    const formatTime = (totalMin: number) => {
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const startTime = formatTime(slotStartTotal);
+    const endTime = formatTime(slotEndTotal);
+
+    subBlocks.push({
+      code: `${baseBlock.code}-sub-${i + 1}`,
+      label: `${baseBlock.code} - Sub ${i + 1} (${startTime} - ${endTime})`,
+      startTime,
+      endTime,
+    });
+  }
+
+  return subBlocks;
+}
+
+function getBaseBlockStatus(baseBlock: TimeSlot, divisions: number, occupiedSlots: OccupiedSlot[]) {
+  if (divisions <= 1) {
+    return isSlotOccupied(baseBlock.startTime, baseBlock.endTime, occupiedSlots) ? 'occupied' : 'free';
+  }
+
+  const subs = getSubBlocks(baseBlock, divisions);
+  const occupiedCount = subs.filter((sub) => isSlotOccupied(sub.startTime, sub.endTime, occupiedSlots)).length;
+
+  if (occupiedCount === subs.length) {
+    return 'occupied';
+  } else if (occupiedCount > 0) {
+    return 'partial';
+  }
+  return 'free';
 }
 
 
@@ -109,43 +166,9 @@ export default function ReservasScreen() {
   const dateOptions = React.useMemo(() => buildDateOptions(14), []);
   const [search, setSearch] = React.useState('');
   const [subSlots, setSubSlots] = React.useState<TimeSlot[]>([]);
+  const [selectedBaseBlock, setSelectedBaseBlock] = React.useState<string | null>(null);
 
-  // Función para cargar disponibilidad y subbloques desde backend
-  const loadAvailability = async (spaceId: string, date: dayjs.Dayjs) => {
-    try {
-      const data = await apiGet<SpaceAvailability>(
-        `/spaces/${spaceId}/availability?date=${date.format('YYYY-MM-DD')}`,
-        token
-      );
 
-      setAvailability(data);
-
-      // Si el backend devuelve divisiones configuradas
-      if (data.divisions && data.divisions.length > 0) {
-        // Mapear divisiones a subSlots
-        const mapped = data.divisions.map((div, idx) => ({
-          code: `${spaceId}-${idx}`,
-          label: `${div.startTime} - ${div.endTime}`,
-          startTime: div.startTime,
-          endTime: div.endTime,
-        }));
-        setSubSlots(mapped);
-      } else {
-        setSubSlots([]);
-      }
-
-      // Seleccionar primer slot disponible
-      const firstAvailableSlot =
-        TIME_SLOTS.find(
-          (slot) => !data.ocupiedSlots.some((occupied) => overlaps(slot, occupied))
-        ) ?? null;
-      setSelectedSlot(firstAvailableSlot);
-    } catch (err) {
-      Alert.alert('Error', 'No se pudo cargar disponibilidad');
-      setAvailability(emptyAvailability);
-      setSubSlots([]);
-    }
-  };
 
   const loadSpaces = React.useCallback(async () => {
     const response = await apiGet<SpacesResponse | Space[] | { data?: Space[] }>('/spaces?page=1&limit=100', token);
@@ -183,6 +206,8 @@ export default function ReservasScreen() {
     if (!selectedSpace) {
       setAvailability(emptyAvailability);
       setSelectedSlot(null);
+      setSelectedBaseBlock(null);
+      setSubSlots([]);
       return;
     }
 
@@ -194,14 +219,25 @@ export default function ReservasScreen() {
 
         if (active) {
           setAvailability(data);
-          const firstAvailableSlot = TIME_SLOTS.find((slot) => !data.ocupiedSlots.some((occupied) => overlaps(slot, occupied))) ?? null;
-          setSelectedSlot(firstAvailableSlot);
+          const divisions = data.divisions ?? 1;
+          setSubSlots([]);
+          if (divisions <= 1) {
+            const firstAvailableSlot = TIME_SLOTS.find((slot) => !data.ocupiedSlots.some((occupied) => overlaps(slot, occupied))) ?? null;
+            setSelectedSlot(firstAvailableSlot);
+            setSelectedBaseBlock(firstAvailableSlot?.code ?? null);
+          } else {
+            setSelectedSlot(null);
+            setSelectedBaseBlock(null);
+          }
         }
       } catch (requestError) {
         if (active) {
           const message = requestError instanceof ApiError ? requestError.message : 'No se pudo consultar la disponibilidad del espacio.';
           setError(message);
           setAvailability(emptyAvailability);
+          setSelectedSlot(null);
+          setSelectedBaseBlock(null);
+          setSubSlots([]);
         }
       }
     })();
@@ -503,38 +539,60 @@ export default function ReservasScreen() {
               </ScrollView>
 
               <Text style={styles.sectionLabel}>Bloque a reservar</Text>
+              {availability.divisions && availability.divisions > 1 ? (
+                <Text style={styles.infoLabel}>
+                  El horario para esta fecha tiene {availability.divisions} divisiones. Selecciona un bloque base para ver sus subdivisiones:
+                </Text>
+              ) : null}
+
               <View style={styles.slotGrid}>
                 {TIME_SLOTS.map((slot) => {
-                  const occupied = availability.ocupiedSlots.some((occupiedSlot) => overlaps(slot, occupiedSlot));
+                  const divisions = availability.divisions ?? 1;
+                  const status = getBaseBlockStatus(slot, divisions, availability.ocupiedSlots);
+                  const isOccupied = status === 'occupied';
+                  const isPartial = status === 'partial';
+                  const allowedBySpace = !selectedSpace?.allowedTimeSlots?.length || selectedSpace.allowedTimeSlots.includes(getSlotKey(slot));
                   const past = isPastSlot(slot, selectedDate);
-                  const disabled = occupied || past;
-                  const selected = selectedSlot?.code === slot.code;
+                  
+                  const disabled = isOccupied || !allowedBySpace || past;
+                  const selected = selectedBaseBlock === slot.code;
+
+                  let displayLabel = slot.label;
+                  if (isOccupied) {
+                    displayLabel = `${slot.code} (Ocupado)`;
+                  } else if (isPartial && divisions > 1) {
+                    displayLabel = `${slot.code} (Parcial)`;
+                  }
 
                   return (
                     <TouchableOpacity
                       key={slot.code}
-                      style={[styles.slotButton, disabled && styles.slotButtonDisabled, selected && styles.slotButtonSelected]}
+                      style={[
+                        styles.slotButton, 
+                        disabled && styles.slotButtonDisabled, 
+                        selected && styles.slotButtonSelected,
+                        isPartial && !selected && styles.slotButtonPartial
+                      ]}
                       onPress={() => {
                         if (!disabled) {
-                          setSelectedSlot(slot);
-                          // Si el backend devuelve divisiones, mapearlas a subSlots
-                          if (availability.divisions && availability.divisions.length > 0) {
-                            const mapped = availability.divisions.map((div, idx) => ({
-                              code: `${slot.code}-${idx}`,
-                              label: `${slot.code}${idx + 1} ${div.startTime} - ${div.endTime}`,
-                              startTime: div.startTime,
-                              endTime: div.endTime,
-                            }));
-                            setSubSlots(mapped);
-                          } else {
+                          setSelectedBaseBlock(slot.code);
+                          if (divisions <= 1) {
+                            setSelectedSlot(slot);
                             setSubSlots([]);
+                          } else {
+                            setSelectedSlot(null); // Requiere seleccionar una subdivisión
+                            setSubSlots(getSubBlocks(slot, divisions));
                           }
                         }
                       }}
                       disabled={disabled}
                     >
-                      <Text style={[styles.slotButtonText, selected && styles.slotButtonTextSelected]}>
-                        {slot.label}{past ? ' (pasado)' : ''}
+                      <Text style={[
+                        styles.slotButtonText, 
+                        selected && styles.slotButtonTextSelected,
+                        isPartial && !selected && styles.slotButtonTextPartial
+                      ]}>
+                        {displayLabel}{past ? ' (pasado)' : ''}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -546,7 +604,7 @@ export default function ReservasScreen() {
                 <View style={styles.subSlotGrid}>
                   {subSlots.map((sub) => {
                     const past = isPastSlot(sub, selectedDate);
-                    const occupied = availability.ocupiedSlots.some((occ) => overlaps(sub, occ));
+                    const occupied = isSlotOccupied(sub.startTime, sub.endTime, availability.ocupiedSlots);
                     const disabled = past || occupied;
                     const selected = selectedSlot?.code === sub.code;
 
@@ -906,9 +964,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
 },
-
-subSlotGrid: {
-  flexDirection: 'row',
+  slotButtonPartial: {
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    backgroundColor: '#fff9e6',
+  },
+  slotButtonTextPartial: {
+    color: '#b26a00',
+  },
+  infoLabel: {
+    color: '#3D4B63',
+    fontSize: 12,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  subSlotGrid: {
+    flexDirection: 'row',
   flexWrap: 'wrap',
   gap: 8,
   marginTop: 12,

@@ -81,17 +81,12 @@ export type OccupiedSlot = {
   endTime: string;
 };
 
-type DivisionSlot = {
-  startTime: string;
-  endTime: string;
-};
-
 export type SpaceAvailability = {
   spaceId: string;
   date: string;
   timezone: string;
   ocupiedSlots: OccupiedSlot[];
-  divisions?: DivisionSlot[]; 
+  divisions?: number; 
 };
 
 export type ReservationRecord = {
