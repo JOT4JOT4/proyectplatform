@@ -1,5 +1,17 @@
 import React from 'react';
-import {  View,  Text,  StyleSheet,  FlatList,  TouchableOpacity,  Modal, Pressable,  ScrollView,  Alert,  Image, TextInput,
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
+  Alert,
+  Image,
+  TextInput,
+  Platform,
 } from 'react-native';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
@@ -171,7 +183,7 @@ export default function ReservasScreen() {
   const [search, setSearch] = React.useState('');
   const [subSlots, setSubSlots] = React.useState<TimeSlot[]>([]);
   const [selectedBaseBlock, setSelectedBaseBlock] = React.useState<string | null>(null);
- const [showDatePicker, setShowDatePicker] = React.useState(false);
+  const [showDatePicker, setShowDatePicker] = React.useState(false);
 
 
 
@@ -425,28 +437,47 @@ export default function ReservasScreen() {
       </View>
 
       {showDatePicker && (
-        <Modal transparent={true} animationType="fade">
-          <View style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.5)'
-          }}>
-            <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 8 }}>
-              <DateTimePicker
-                value={selectedDate.toDate()}
-                mode="date"
-                display="default"   // usa "default" para Android, "spinner"/"inline" para iOS
-                locale="es-ES"
-                onChange={(event, date) => {
-                  setShowDatePicker(false);
-                  if (date) {
-                    setSelectedDate(dayjs(date));
-                  }
-                }}
-              />
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                <Text style={{ marginTop: 10, textAlign: 'center', color: 'blue' }}>Cerrar</Text>
+        <Modal transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={styles.calendarCard}>
+              <Text style={styles.calendarTitle}>Seleccionar fecha</Text>
+
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={selectedDate.format('YYYY-MM-DD')}
+                  onChange={(event) => {
+                    setSelectedDate(dayjs(event.currentTarget.value));
+                    setShowDatePicker(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    borderRadius: 10,
+                    border: '1px solid #D9E3F0',
+                    fontSize: 16,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              ) : (
+                <DateTimePicker
+                  value={selectedDate.toDate()}
+                  mode="date"
+                  display="calendar"
+                  onChange={(event, date) => {
+                    setShowDatePicker(false);
+                    if (date) {
+                      setSelectedDate(dayjs(date));
+                    }
+                  }}
+                />
+              )}
+
+              <TouchableOpacity
+                style={styles.calendarCloseButton}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.calendarCloseText}>Cerrar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1026,6 +1057,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0059e9',
   },
+  calendarOverlay: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  padding: 16,
+},
+
+calendarCard: {
+  width: '90%',
+  maxWidth: 360,
+  backgroundColor: '#fff',
+  borderRadius: 18,
+  padding: 20,
+},
+
+calendarTitle: {
+  color: '#081026',
+  fontSize: 18,
+  fontWeight: '800',
+  marginBottom: 14,
+  textAlign: 'center',
+},
+
+calendarCloseButton: {
+  marginTop: 14,
+  borderWidth: 1,
+  borderColor: '#0059e9',
+  borderRadius: 12,
+  paddingVertical: 12,
+  alignItems: 'center',
+},
+
+calendarCloseText: {
+  color: '#0059e9',
+  fontWeight: '700',
+},
   primaryButtonText: {
     color: '#fff',
     fontWeight: '700',
