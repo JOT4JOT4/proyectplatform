@@ -168,6 +168,54 @@ describe('ReservationsService', () => {
       await expect(service.create(misalignedDto, mockUser.id, 'user'))
         .rejects.toThrow(BadRequestException);
     });
+
+    it('should reject if standard user tries to book consecutive slots on the same day', async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 'res-consecutive', date: '2026-06-30', startTime: '07:00', endTime: '08:10', status: ReservationStatus.PENDING }
+        ]),
+      };
+      
+      jest.spyOn(reservationRepository.manager, 'transaction').mockImplementation(async (cb) => {
+        return cb({
+          findOne: jest.fn().mockResolvedValue(mockSpace),
+          createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+          create: jest.fn().mockImplementation((entityClass, dto) => dto),
+          save: jest.fn().mockImplementation((entityClass, entity) => Promise.resolve(entity)),
+        } as any);
+      });
+
+      await expect(service.create(validDto, mockUser.id, 'user'))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject if standard user has an overlapping reservation at the same time', async () => {
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      mockQueryBuilder.getOne.mockResolvedValue({ id: 'res-overlap', date: '2026-06-30', startTime: '08:10', endTime: '09:40', status: ReservationStatus.PENDING });
+
+      jest.spyOn(reservationRepository.manager, 'transaction').mockImplementation(async (cb) => {
+        return cb({
+          findOne: jest.fn().mockResolvedValue(mockSpace),
+          createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+          create: jest.fn().mockImplementation((entityClass, dto) => dto),
+          save: jest.fn().mockImplementation((entityClass, entity) => Promise.resolve(entity)),
+        } as any);
+      });
+
+      await expect(service.create(validDto, mockUser.id, 'user'))
+        .rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('confirm', () => {
