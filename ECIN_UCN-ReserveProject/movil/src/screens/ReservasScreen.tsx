@@ -306,7 +306,6 @@ export default function ReservasScreen() {
       return;
     }
 
-    // Validación de bloque pasado
     if (isPastSlot(selectedSlot, selectedDate)) {
       Alert.alert('Reserva no permitida', 'No puedes reservar en un horario que ya ocurrió.');
       return;
@@ -318,8 +317,8 @@ export default function ReservasScreen() {
       const payload = {
         spaceId: selectedSpace.id,
         date: selectedDate.format('YYYY-MM-DD'),
-        startTime: selectedSlot.startTime, // puede ser de bloque o subbloque
-        endTime: selectedSlot.endTime,     // idem
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
       };
 
       await apiPost<ReservationRecord>('/reservations', payload, token);
@@ -342,6 +341,7 @@ export default function ReservasScreen() {
       setIsLoading(false);
     }
   };
+
 
 
   return (
