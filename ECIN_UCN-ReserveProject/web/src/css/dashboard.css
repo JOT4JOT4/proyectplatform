@@ -725,6 +725,81 @@
   border: 3px solid #7db8ff;
 }
 
+.admin-config-subtitle {
+  width: 85%;
+  margin: -24px auto 0 auto;
+  color: white;
+  font-size: 16px;
+}
+
+.settings-card {
+  width: 85%;
+  background: #f4f7fb;
+  border-radius: 18px;
+  padding: 22px 26px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.settings-card h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.settings-card p {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: #30455f;
+}
+
+.settings-current {
+  background: white;
+  border: 2px solid #d8e3f0;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settings-current span {
+  font-weight: 800;
+  color: #003057;
+}
+
+.settings-card input {
+  width: 100%;
+  border: 2px solid #d8e3f0;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.settings-save-btn {
+  width: 85%;
+  margin: 0 auto;
+  background: #003057;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-weight: 800;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.settings-save-btn:hover {
+  background: #004878;
+}
+
+.settings-save-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1100px) {
   .modal-content {
     flex-direction: column;

@@ -93,3 +93,26 @@ export async function deleteSpaceBlock(id: string) {
     method: "DELETE",
   });
 }
+
+export type ReservationSetting = {
+  id?: string;
+  key: string;
+  value: string;
+};
+
+export async function getReservationSettings(): Promise<ReservationSetting[]> {
+  return apiRequest("/reservations/settings");
+}
+
+export async function saveReservationSetting(
+  key: string,
+  value: string,
+): Promise<ReservationSetting> {
+  return apiRequest("/reservations/settings", {
+    method: "POST",
+    body: JSON.stringify({
+      key,
+      value,
+    }),
+  });
+}

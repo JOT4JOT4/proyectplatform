@@ -14,6 +14,8 @@ import {
   deleteSpaceBlock,
   type SpacePayload,
   type SpaceBlockPayload,
+  getReservationSettings,
+  saveReservationSetting,
 } from "../services/Api";
 
 type Reserva = {
@@ -38,6 +40,8 @@ type ReservaGuardada = Reserva & {
   fechaReservada: string;
   horarioReservado: string;
   status?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 type Space = {
@@ -203,6 +207,8 @@ function mapBackendReservationToReservaGuardada(
     fechaReservada: res.date,
     horarioReservado: horarioReservado,
     status: res.status,
+    startTime: start,
+    endTime: end,
   };
 }
 
@@ -347,7 +353,7 @@ export default function Dashboard() {
   });
 
   const [vista, setVista] = useState<
-    "salas" | "misReservas" | "adminReservas" | "adminEspacios" | "adminBloqueos"
+    "salas" | "misReservas" | "adminReservas" | "adminEspacios" | "adminBloqueos" | "adminConfiguracion"
   >("salas");
 
   useEffect(() => {
@@ -802,6 +808,91 @@ export default function Dashboard() {
     window.location.href = "/";
   };
 
+  const isReservationFuture = (date: string, endTime: string) => {
+  const reservationEnd = new Date(`${date}T${endTime}`);
+  const now = new Date();
+
+  return reservationEnd > now;
+  };
+
+  const [reservationSettings, setReservationSettings] = useState({
+    reservation_max_advance_days: "10",
+    cancel_deadline_days: "1",
+    reservation_weekly_limit: "10",
+  });
+
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
+  const cargarReservationSettings = async () => {
+    try {
+      setLoadingSettings(true);
+      setSettingsError("");
+      setSettingsMessage("");
+
+      const response = await getReservationSettings();
+
+      const settingsMap = response.reduce<Record<string, string>>(
+        (acc, setting) => {
+          acc[setting.key] = setting.value;
+          return acc;
+        },
+        {},
+      );
+
+      setReservationSettings((prev) => ({
+        ...prev,
+        reservation_max_advance_days:
+          settingsMap.reservation_max_advance_days ??
+          prev.reservation_max_advance_days,
+
+        cancel_deadline_days:
+          settingsMap.cancel_deadline_days ??
+          prev.cancel_deadline_days,
+
+        reservation_weekly_limit:
+          settingsMap.reservation_weekly_limit ??
+          prev.reservation_weekly_limit,
+      }));
+    } catch (error) {
+      console.error("Error cargando configuración:", error);
+      setSettingsError("No se pudo cargar la configuración.");
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const guardarReservationSettings = async () => {
+    try {
+      setLoadingSettings(true);
+      setSettingsError("");
+      setSettingsMessage("");
+
+      await saveReservationSetting(
+        "reservation_max_advance_days",
+        reservationSettings.reservation_max_advance_days,
+      );
+
+      await saveReservationSetting(
+        "cancel_deadline_days",
+        reservationSettings.cancel_deadline_days,
+      );
+
+      await saveReservationSetting(
+        "reservation_weekly_limit",
+        reservationSettings.reservation_weekly_limit,
+      );
+
+      setSettingsMessage("Configuración guardada correctamente.");
+    } catch (error) {
+      console.error("Error guardando configuración:", error);
+      setSettingsError("No se pudo guardar la configuración.");
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
   return (
     <div className="dashboard-page">
       {successMessage && (
@@ -871,6 +962,17 @@ export default function Dashboard() {
               }}
             >
               Bloquear horarios
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className="menu-option"
+              onClick={() => {
+                setVista("adminConfiguracion");
+                cargarReservationSettings();
+              }}
+            >
+              Configuración
             </button>
           )}
           <button
@@ -990,6 +1092,11 @@ export default function Dashboard() {
               !errorMisReservas &&
               misReservas
                 .filter((reserva) => reserva.status !== "cancelled")
+                .filter((reserva) =>
+                reserva.endTime
+                  ? isReservationFuture(reserva.fechaReservada, reserva.endTime)
+                  : true
+                )
                 .map((reserva) => (
                 <div
                   className="room-card"
@@ -1413,6 +1520,114 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+              </>
+            )}
+            {vista === "adminConfiguracion" && (
+              <>
+                <div className="admin-section-title">
+                  Configuración de reservas
+                </div>
+
+                <div className="admin-config-subtitle">
+                  Estos límites afectan las reservas realizadas desde web y móvil.
+                </div>
+
+                {settingsError && (
+                  <div className="form-message form-message-error">
+                    {settingsError}
+                  </div>
+                )}
+
+                {settingsMessage && (
+                  <div className="form-message form-message-success">
+                    {settingsMessage}
+                  </div>
+                )}
+
+                {loadingSettings && (
+                  <div className="empty-card">Cargando configuración...</div>
+                )}
+
+                {!loadingSettings && (
+                  <>
+                    <div className="settings-card">
+                      <h3>Anticipación máxima para reservar</h3>
+                      <p>Cantidad máxima de días hacia adelante que un usuario puede reservar.</p>
+
+                      <div className="settings-current">
+                        <strong>Valor actual</strong>
+                        <span>{reservationSettings.reservation_max_advance_days} días</span>
+                      </div>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={reservationSettings.reservation_max_advance_days}
+                        onChange={(e) =>
+                          setReservationSettings({
+                            ...reservationSettings,
+                            reservation_max_advance_days: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="settings-card">
+                      <h3>Plazo mínimo para cancelar</h3>
+                      <p>
+                        Cantidad mínima de días antes de la reserva para cancelar sin advertencia.
+                      </p>
+
+                      <div className="settings-current">
+                        <strong>Valor actual</strong>
+                        <span>{reservationSettings.cancel_deadline_days} días</span>
+                      </div>
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={reservationSettings.cancel_deadline_days}
+                        onChange={(e) =>
+                          setReservationSettings({
+                            ...reservationSettings,
+                            cancel_deadline_days: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="settings-card">
+                      <h3>Límite semanal de reservas</h3>
+                      <p>Cantidad máxima de reservas que un usuario puede hacer por semana.</p>
+
+                      <div className="settings-current">
+                        <strong>Valor actual</strong>
+                        <span>{reservationSettings.reservation_weekly_limit}</span>
+                      </div>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={reservationSettings.reservation_weekly_limit}
+                        onChange={(e) =>
+                          setReservationSettings({
+                            ...reservationSettings,
+                            reservation_weekly_limit: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      className="settings-save-btn"
+                      onClick={guardarReservationSettings}
+                      disabled={loadingSettings}
+                    >
+                      Guardar configuración
+                    </button>
+                  </>
+                )}
               </>
             )}
           </section>
