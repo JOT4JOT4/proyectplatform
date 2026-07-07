@@ -2,9 +2,13 @@ import React from 'react';
 import {  View,  Text,  StyleSheet,  FlatList,  TouchableOpacity,  Modal, Pressable,  ScrollView,  Alert,  Image, TextInput,
 } from 'react-native';
 import dayjs from 'dayjs';
+import 'dayjs/locale/es';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { apiGet, apiPost, ApiError } from '../services/apiClient';
 import type { OccupiedSlot, ReservationRecord, Space, SpaceAvailability, SpacesResponse } from '../services/apiTypes';
+
+dayjs.locale('es');
 
 type TimeSlot = {
   code: string;
@@ -167,6 +171,7 @@ export default function ReservasScreen() {
   const [search, setSearch] = React.useState('');
   const [subSlots, setSubSlots] = React.useState<TimeSlot[]>([]);
   const [selectedBaseBlock, setSelectedBaseBlock] = React.useState<string | null>(null);
+ const [showDatePicker, setShowDatePicker] = React.useState(false);
 
 
 
@@ -406,9 +411,11 @@ export default function ReservasScreen() {
             <Text style={styles.dropdownValue} numberOfLines={1}>{selectedType ?? 'Todos'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.dropdownButton} onPress={() => openPicker('date')}>
+          <TouchableOpacity style={styles.dropdownButton} onPress={() => setShowDatePicker(true)}>
             <Text style={styles.dropdownLabel}>Día</Text>
-            <Text style={styles.dropdownValue} numberOfLines={1}>{selectedDayLabel}</Text>
+            <Text style={styles.dropdownValue} numberOfLines={1}>
+              {selectedDate.isSame(dayjs(), 'day') ? 'Hoy' : selectedDate.format('DD/MM/YYYY')}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -416,6 +423,21 @@ export default function ReservasScreen() {
           <Text style={styles.clearButtonText}>Limpiar filtros</Text>
         </TouchableOpacity>
       </View>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={selectedDate.toDate()}
+              mode="date"
+              display="calendar"
+              onChange={(event, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  setSelectedDate(dayjs(date));
+                }
+              }}
+            />
+          )}
+
 
 
       {isLoading ? <Text style={styles.note}>Cargando información...</Text> : null}
